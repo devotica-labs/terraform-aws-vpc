@@ -77,14 +77,25 @@ jobs:
           output-method: inject
           fail-on-diff: true
 
+  # FIX 1: Added OIDC auth — terraform plan needs real AWS creds
+  # because data.tf has aws_caller_identity, aws_partition, aws_region
+  # FIX 2: .opa/ folder added with basic policy
+  # Replace with terraform-policies repo content when ready
   conftest:
     name: conftest OPA
     needs: validate
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_OIDC_ROLE_ARN }}
+          aws-region: ap-south-1
+
       - uses: hashicorp/setup-terraform@v3
         with: { terraform_version: "~1.8" }
+
       - name: Generate plan JSON
         run: |
           terraform init -backend=false
@@ -95,6 +106,7 @@ jobs:
             -var='public_subnet_cidrs=["10.0.0.0/24","10.0.1.0/24"]' \
             -var='private_subnet_cidrs=["10.0.10.0/24","10.0.11.0/24"]'
           terraform show -json tfplan.binary > tfplan.json
+
       - uses: instrumenta/conftest-action@v0.5.1
         with:
           files: tfplan.json
@@ -126,6 +138,9 @@ jobs:
           output_file_path: console,checkov.sarif
           soft_fail: true
 
+  # FIX 3: infracost skips gracefully if INFRACOST_API_KEY not set
+  # To enable: Settings → Secrets → INFRACOST_API_KEY
+  # Free key at: infracost.io
   infracost:
     name: infracost (inform)
     needs: validate
@@ -135,17 +150,34 @@ jobs:
       pull-requests: write
     steps:
       - uses: actions/checkout@v4
+
+      - name: Skip if no API key
+        id: check_key
+        run: |
+          if [ -z "${{ secrets.INFRACOST_API_KEY }}" ]; then
+            echo "skip=true" >> $GITHUB_OUTPUT
+            echo "INFRACOST_API_KEY not set — skipping cost estimate"
+          else
+            echo "skip=false" >> $GITHUB_OUTPUT
+          fi
+
       - uses: infracost/actions/setup@v3
+        if: steps.check_key.outputs.skip == 'false'
         with:
           api-key: ${{ secrets.INFRACOST_API_KEY }}
-      - run: |
+
+      - name: Run infracost diff
+        if: steps.check_key.outputs.skip == 'false'
+        run: |
           infracost diff \
             --path=. \
             --format=json \
             --out-file=/tmp/infracost.json \
             --terraform-var="name=ci" \
             --terraform-var="cidr_block=10.0.0.0/16" || true
+
       - uses: infracost/actions/comment@v3
+        if: steps.check_key.outputs.skip == 'false'
         with:
           path: /tmp/infracost.json
           behavior: update
@@ -166,10 +198,10 @@ jobs:
       - run: terraform validate
         working-directory: examples/${{ matrix.example }}
 
-  # ── Branch protection gate ───────────────────────────────────────────────
   all_green:
     name: all checks green
     needs: [tflint, tfsec, gitleaks, terraform_docs, conftest, terraform_test, checkov, infracost, examples_build]
     runs-on: ubuntu-latest
     steps:
       - run: echo "All CI checks passed."
+
