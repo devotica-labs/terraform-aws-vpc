@@ -1,0 +1,149 @@
+# ---------------------------------------------------------------------------
+# Core identity
+# ---------------------------------------------------------------------------
+
+variable "name" {
+  description = "Logical name for the VPC. Used as a prefix for all child resources."
+  type        = string
+  validation {
+    condition     = length(var.name) >= 1 && length(var.name) <= 50
+    error_message = "name must be 1–50 characters."
+  }
+}
+
+# ---------------------------------------------------------------------------
+# Networking
+# ---------------------------------------------------------------------------
+
+variable "cidr_block" {
+  description = "Primary IPv4 CIDR block for the VPC (e.g. 10.0.0.0/16)."
+  type        = string
+  validation {
+    condition     = can(cidrhost(var.cidr_block, 0))
+    error_message = "cidr_block must be valid CIDR notation."
+  }
+}
+
+variable "availability_zones" {
+  description = "Ordered list of AZ names to span (e.g. [\"ap-south-1a\", \"ap-south-1b\"]). Must have 2–6 entries."
+  type        = list(string)
+  validation {
+    condition     = length(var.availability_zones) >= 2 && length(var.availability_zones) <= 6
+    error_message = "Provide between 2 and 6 Availability Zones."
+  }
+}
+
+variable "public_subnet_cidrs" {
+  description = "IPv4 CIDRs for public subnets. Length must match availability_zones. Leave empty to create no public subnets."
+  type        = list(string)
+  default     = []
+  validation {
+    condition     = alltrue([for c in var.public_subnet_cidrs : can(cidrhost(c, 0))])
+    error_message = "All public_subnet_cidrs must be valid CIDR notation."
+  }
+}
+
+variable "private_subnet_cidrs" {
+  description = "IPv4 CIDRs for private subnets. Length must match availability_zones. Leave empty to create no private subnets."
+  type        = list(string)
+  default     = []
+  validation {
+    condition     = alltrue([for c in var.private_subnet_cidrs : can(cidrhost(c, 0))])
+    error_message = "All private_subnet_cidrs must be valid CIDR notation."
+  }
+}
+
+# ---------------------------------------------------------------------------
+# NAT Gateway
+# ---------------------------------------------------------------------------
+
+variable "enable_nat_gateway" {
+  description = "Create NAT gateways to give private subnets outbound Internet access."
+  type        = bool
+  default     = true
+}
+
+variable "single_nat_gateway" {
+  description = "Route all private subnets through one NAT gateway (first AZ). Reduces cost; not HA. Use only in dev/sandbox."
+  type        = bool
+  default     = false
+}
+
+# ---------------------------------------------------------------------------
+# DNS
+# ---------------------------------------------------------------------------
+
+variable "enable_dns_support" {
+  description = "Enable DNS resolution in the VPC."
+  type        = bool
+  default     = true
+}
+
+variable "enable_dns_hostnames" {
+  description = "Assign public DNS hostnames to instances with public IPs."
+  type        = bool
+  default     = true
+}
+
+# ---------------------------------------------------------------------------
+# IPv6
+# ---------------------------------------------------------------------------
+
+variable "enable_ipv6" {
+  description = "Request an Amazon-provided /56 IPv6 CIDR and assign /64 CIDRs to every subnet."
+  type        = bool
+  default     = false
+}
+
+# ---------------------------------------------------------------------------
+# VPC Flow Logs
+# ---------------------------------------------------------------------------
+
+variable "enable_flow_logs" {
+  description = "Enable VPC Flow Logs to CloudWatch Logs."
+  type        = bool
+  default     = true
+}
+
+variable "flow_logs_retention_days" {
+  description = "CloudWatch Logs retention period for flow log entries."
+  type        = number
+  default     = 30
+  validation {
+    condition = contains(
+      [0, 1, 3, 5, 7, 14, 30, 60, 90, 120, 150, 180, 365, 400, 545, 731, 1096, 1827, 2192, 2557, 2922, 3288, 3653],
+      var.flow_logs_retention_days
+    )
+    error_message = "flow_logs_retention_days must be an AWS-supported value."
+  }
+}
+
+variable "flow_logs_traffic_type" {
+  description = "Traffic to capture: ACCEPT, REJECT, or ALL."
+  type        = string
+  default     = "ALL"
+  validation {
+    condition     = contains(["ACCEPT", "REJECT", "ALL"], var.flow_logs_traffic_type)
+    error_message = "flow_logs_traffic_type must be ACCEPT, REJECT, or ALL."
+  }
+}
+
+# ---------------------------------------------------------------------------
+# CIS hardening
+# ---------------------------------------------------------------------------
+
+variable "manage_default_security_group" {
+  description = "Take ownership of the default security group and remove all rules (CIS AWS Foundations 4.3)."
+  type        = bool
+  default     = true
+}
+
+# ---------------------------------------------------------------------------
+# Tagging
+# ---------------------------------------------------------------------------
+
+variable "tags" {
+  description = "Additional tags merged onto every taggable resource."
+  type        = map(string)
+  default     = {}
+}

@@ -1,0 +1,175 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  pull-requests: write
+  id-token: write
+
+jobs:
+  fmt:
+    name: terraform fmt
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with: { terraform_version: "~1.8" }
+      - run: terraform fmt -check -recursive
+
+  validate:
+    name: terraform validate
+    needs: fmt
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with: { terraform_version: "~1.8" }
+      - run: terraform init -backend=false
+      - run: terraform validate
+
+  tflint:
+    name: tflint
+    needs: validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: terraform-linters/setup-tflint@v4
+        with: { tflint_version: v0.50.3 }
+      - run: tflint --init && tflint --format compact
+
+  tfsec:
+    name: tfsec HIGH/CRIT
+    needs: validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aquasecurity/tfsec-action@v1.0.3
+        with:
+          minimum_severity: HIGH
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+
+  gitleaks:
+    name: gitleaks
+    needs: validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  terraform_docs:
+    name: terraform-docs verify
+    needs: validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: terraform-docs/gh-actions@v1
+        with:
+          working-dir: .
+          output-file: README.md
+          output-method: inject
+          fail-on-diff: true
+
+  conftest:
+    name: conftest OPA
+    needs: validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with: { terraform_version: "~1.8" }
+      - name: Generate plan JSON
+        run: |
+          terraform init -backend=false
+          terraform plan -out=tfplan.binary \
+            -var="name=ci" \
+            -var='cidr_block=10.0.0.0/16' \
+            -var='availability_zones=["ap-south-1a","ap-south-1b"]' \
+            -var='public_subnet_cidrs=["10.0.0.0/24","10.0.1.0/24"]' \
+            -var='private_subnet_cidrs=["10.0.10.0/24","10.0.11.0/24"]'
+          terraform show -json tfplan.binary > tfplan.json
+      - uses: instrumenta/conftest-action@v0.5.1
+        with:
+          files: tfplan.json
+          policy: .opa/
+
+  terraform_test:
+    name: terraform test (unit + contract)
+    needs: validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with: { terraform_version: "~1.8" }
+      - run: terraform init -backend=false
+      - run: terraform test -filter=tests/unit.tftest.hcl
+      - run: terraform test -filter=tests/contract.tftest.hcl
+
+  checkov:
+    name: checkov (inform)
+    needs: validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: bridgecrewio/checkov-action@v12
+        with:
+          directory: .
+          framework: terraform
+          output_format: cli,sarif
+          output_file_path: console,checkov.sarif
+          soft_fail: true
+
+  infracost:
+    name: infracost (inform)
+    needs: validate
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: infracost/actions/setup@v3
+        with:
+          api-key: ${{ secrets.INFRACOST_API_KEY }}
+      - run: |
+          infracost diff \
+            --path=. \
+            --format=json \
+            --out-file=/tmp/infracost.json \
+            --terraform-var="name=ci" \
+            --terraform-var="cidr_block=10.0.0.0/16" || true
+      - uses: infracost/actions/comment@v3
+        with:
+          path: /tmp/infracost.json
+          behavior: update
+
+  examples_build:
+    name: examples build
+    needs: validate
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        example: [basic, complete]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with: { terraform_version: "~1.8" }
+      - run: terraform init -backend=false
+        working-directory: examples/${{ matrix.example }}
+      - run: terraform validate
+        working-directory: examples/${{ matrix.example }}
+
+  # ── Branch protection gate ───────────────────────────────────────────────
+  all_green:
+    name: all checks green
+    needs: [tflint, tfsec, gitleaks, terraform_docs, conftest, terraform_test, checkov, infracost, examples_build]
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "All CI checks passed."

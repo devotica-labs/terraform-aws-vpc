@@ -1,0 +1,12 @@
+output "vpc_id"                            { value = module.vpc.vpc_id }
+output "vpc_arn"                           { value = module.vpc.vpc_arn }
+output "vpc_cidr_block"                    { value = module.vpc.vpc_cidr_block }
+output "vpc_ipv6_cidr_block"               { value = module.vpc.vpc_ipv6_cidr_block }
+output "public_subnet_ids"                 { value = module.vpc.public_subnet_ids }
+output "private_subnet_ids"                { value = module.vpc.private_subnet_ids }
+output "nat_gateway_ids"                   { value = module.vpc.nat_gateway_ids }
+output "nat_public_ips"                    { value = module.vpc.nat_public_ips }
+output "internet_gateway_id"               { value = module.vpc.internet_gateway_id }
+output "default_security_group_id"         { value = module.vpc.default_security_group_id }
+output "flow_log_id"                       { value = module.vpc.flow_log_id }
+output "flow_log_cloudwatch_log_group_arn" { value = module.vpc.flow_log_cloudwatch_log_group_arn }
