@@ -1,6 +1,10 @@
+# Uses local path during development.
+# Change to Registry source after first release:
+#   source  = "devotica-labs/vpc/aws"
+#   version = "~> 1.0"
+
 module "vpc" {
-  source  = "devotica-labs/vpc/aws"
-  version = "~> 1.0"
+  source = "../.."
 
   name               = "my-vpc"
   cidr_block         = "10.0.0.0/16"
