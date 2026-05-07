@@ -7,7 +7,7 @@ on:
     branches: [main]
 
 permissions:
-  contents: read
+  contents: write       # needed for terraform-docs git-push
   pull-requests: write
   id-token: write
 
@@ -46,20 +46,22 @@ jobs:
         with: { tflint_version: v0.50.3 }
       - run: tflint --init && tflint --format compact
 
-  # FIX: minimum_severity not valid — use additional_args instead
+  # FIX: tfsec action blocked by aquasecurity IP allowlist
+  # Switch to trivy — same security scanning, no IP restrictions
   tfsec:
-    name: tfsec HIGH/CRIT
+    name: security scan (trivy)
     needs: validate
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: aquasecurity/tfsec-action@v1.0.3
+      - uses: aquasecurity/trivy-action@master
         with:
-          additional_args: "--minimum-severity HIGH"
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          soft_fail: true
+          scan-type: config
+          scan-ref: .
+          severity: HIGH,CRITICAL
+          exit-code: 0       # inform only at Tier 1, change to 1 to block
 
-  # FIX: gitleaks org requires paid license → run binary directly instead
+  # FIX: gitleaks org requires paid license → run binary directly
   gitleaks:
     name: gitleaks
     needs: validate
@@ -69,12 +71,14 @@ jobs:
         with: { fetch-depth: 0 }
       - name: Install gitleaks
         run: |
-          curl -sSfL https://github.com/gitleaks/gitleaks/releases/download/v8.18.2/gitleaks_8.18.2_linux_x64.tar.gz \
+          curl -sSfL \
+            https://github.com/gitleaks/gitleaks/releases/download/v8.18.2/gitleaks_8.18.2_linux_x64.tar.gz \
             | tar -xz -C /usr/local/bin gitleaks
       - name: Run gitleaks
         run: gitleaks detect --source . --verbose
 
-  # FIX: terraform-docs — use git-push mode so it auto-commits any diff
+  # FIX: terraform-docs needs contents:write to push back to branch
+  # Also needs the branch checked out with the PR head ref
   terraform_docs:
     name: terraform-docs
     needs: validate
@@ -90,10 +94,10 @@ jobs:
           output-file: README.md
           output-method: inject
           git-push: true
-          git-commit-message: "docs: auto-update terraform-docs"
+          git-push-user-name: github-actions[bot]
+          git-push-user-email: github-actions[bot]@users.noreply.github.com
+          git-commit-message: "docs: auto-update terraform-docs [skip ci]"
 
-  # FIX: instrumenta/conftest-action@v0.5.1 does not exist
-  # Run conftest binary directly instead
   conftest:
     name: conftest OPA
     needs: validate
@@ -130,7 +134,8 @@ jobs:
       - name: Run conftest
         run: conftest test tfplan.json --policy .opa/ --all-namespaces
 
-  # FIX: unit tests — data sources removed so mock provider works cleanly
+  # FIX: contract tests now check resource counts (known at plan time)
+  # not output values (unknown until apply)
   terraform_test:
     name: terraform test (unit + contract)
     needs: validate
@@ -157,7 +162,6 @@ jobs:
           output_file_path: console,checkov.sarif
           soft_fail: true
 
-  # FIX: infracost/actions/comment@v3 path wrong → use correct action path
   infracost:
     name: infracost (inform)
     needs: validate
@@ -204,7 +208,6 @@ jobs:
             --github-token=${{ secrets.GITHUB_TOKEN }} \
             --behavior=update
 
-  # FIX: examples use local source (../...) since not on Registry yet
   examples_build:
     name: examples build
     needs: validate
