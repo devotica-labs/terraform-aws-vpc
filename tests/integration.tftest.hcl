@@ -13,7 +13,7 @@ variables {
   public_subnet_cidrs  = ["10.99.0.0/24", "10.99.1.0/24"]
   private_subnet_cidrs = ["10.99.10.0/24", "10.99.11.0/24"]
   enable_nat_gateway   = true
-  single_nat_gateway   = true   # cheaper for integration runs
+  single_nat_gateway   = true # cheaper for integration runs
   enable_flow_logs     = true
   tags                 = { Environment = "integration-test", Ephemeral = "true" }
 }
