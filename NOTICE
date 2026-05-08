@@ -1,0 +1,29 @@
+terraform-aws-vpc
+Copyright 2026 Devotica Labs
+
+This product includes software developed at Devotica Labs
+(https://github.com/devotica-labs).
+
+================================================================================
+
+This module is derived from and inspired by:
+
+    SourceFuse arc-network
+    Repository:  https://github.com/sourcefuse/terraform-aws-arc-network
+    License:     Apache License 2.0
+    Copyright:   SourceFuse Technologies
+
+The arc-network module provided the architectural blueprint for the public
+subnet / private subnet / NAT gateway layout, the variable shape, and the
+flow-log + endpoint patterns. Devotica's fork adapts the module for fintech
+defaults required by Indian financial-services regulations (RBI circulars,
+DPDP Act, SEBI cyber-resilience guidelines), enforces stricter mandatory
+tags, and integrates with the central CI/policy stack at
+devotica-labs/terraform-shared-config and devotica-labs/terraform-policies.
+
+We thank SourceFuse for publishing arc-network under Apache-2.0.
+
+================================================================================
+
+Third-party components and their licenses are documented in CHANGELOG.md
+and inline where used.

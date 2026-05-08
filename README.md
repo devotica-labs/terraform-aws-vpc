@@ -164,5 +164,22 @@ module "vpc" {
 | <a name="output_vpc_ipv6_cidr_block"></a> [vpc\_ipv6\_cidr\_block](#output\_vpc\_ipv6\_cidr\_block) | Amazon-provided IPv6 CIDR. Empty string when enable\_ipv6 = false. |
 <!-- END_TF_DOCS -->
 
+## Acknowledgements
+
+This module is derived from
+[SourceFuse arc-network](https://github.com/sourcefuse/terraform-aws-arc-network)
+(Apache-2.0). arc-network provided the architectural blueprint for the
+public/private/NAT layout, the variable shape, and the flow-log + VPC
+endpoint patterns. Devotica's fork adapts the module for fintech defaults
+required by Indian financial-services regulations (RBI, DPDP, SEBI),
+enforces stricter mandatory tags, and integrates with our central
+governance stack:
+
+- CI: [`devotica-labs/terraform-shared-config`](https://github.com/devotica-labs/terraform-shared-config)
+- Policy: [`devotica-labs/terraform-policies`](https://github.com/devotica-labs/terraform-policies)
+- Bootstrap: [`devotica-labs/terraform-bootstrap-template`](https://github.com/devotica-labs/terraform-bootstrap-template)
+
+See [NOTICE](NOTICE) for the full attribution.
+
 ## License
 Apache-2.0 — see [LICENSE](LICENSE).
