@@ -36,7 +36,7 @@ module "vpc" {
 # Uses local path during development.
 # Change to Registry source after first release:
 #   source  = "devotica-labs/vpc/aws"
-#   version = "~> 0.2"
+#   version = "~> 0.3"
 
 module "vpc" {
   source = "../.."
