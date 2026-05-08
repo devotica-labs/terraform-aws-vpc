@@ -1,3 +1,16 @@
+# ---------------------------------------------------------------------------
+# CI for terraform-aws-vpc — uses the central reusable workflow from
+# devotica-labs/terraform-shared-config so every module repo enforces the
+# same standard (fmt, validate, tflint, trivy, gitleaks, terraform-docs,
+# conftest against the central terraform-policies pack, terraform test,
+# checkov, examples build).
+#
+# To customise per-repo behaviour, override inputs here. Do NOT re-implement
+# checks inline — that defeats the central-governance model.
+#
+# Refs: terraform-module-repo-plan-vpc-v1.3 §6, governance-tooling-v1.0 §4
+# ---------------------------------------------------------------------------
+
 name: CI
 
 on:
@@ -7,227 +20,15 @@ on:
     branches: [main]
 
 permissions:
-  contents: write       # needed for terraform-docs git-push
+  contents: write       # terraform-docs auto-update pushes back on PRs
   pull-requests: write
   id-token: write
 
 jobs:
-  # ── Stage 1: format ────────────────────────────────────────────────────
-  fmt:
-    name: terraform fmt
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: hashicorp/setup-terraform@v3
-        with: { terraform_version: "~1.8" }
-      - run: terraform fmt -check -recursive
-
-  # ── Stage 2: validate ──────────────────────────────────────────────────
-  validate:
-    name: terraform validate
-    needs: fmt
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: hashicorp/setup-terraform@v3
-        with: { terraform_version: "~1.8" }
-      - run: terraform init -backend=false
-      - run: terraform validate
-
-  # ── Stage 3: parallel quality gates ───────────────────────────────────
-
-  tflint:
-    name: tflint
-    needs: validate
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: terraform-linters/setup-tflint@v4
-        with: { tflint_version: v0.50.3 }
-      - run: tflint --init && tflint --format compact
-
-  # FIX: tfsec action blocked by aquasecurity IP allowlist
-  # Switch to trivy — same security scanning, no IP restrictions
-  tfsec:
-    name: security scan (trivy)
-    needs: validate
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: aquasecurity/trivy-action@master
-        with:
-          scan-type: config
-          scan-ref: .
-          severity: HIGH,CRITICAL
-          exit-code: 0       # inform only at Tier 1, change to 1 to block
-
-  # FIX: gitleaks org requires paid license → run binary directly
-  gitleaks:
-    name: gitleaks
-    needs: validate
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with: { fetch-depth: 0 }
-      - name: Install gitleaks
-        run: |
-          curl -sSfL \
-            https://github.com/gitleaks/gitleaks/releases/download/v8.18.2/gitleaks_8.18.2_linux_x64.tar.gz \
-            | tar -xz -C /usr/local/bin gitleaks
-      - name: Run gitleaks
-        run: gitleaks detect --source . --verbose
-
-  # FIX: terraform-docs needs contents:write to push back to branch
-  # Also needs the branch checked out with the PR head ref
-  terraform_docs:
-    name: terraform-docs
-    needs: validate
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.head_ref }}
-          token: ${{ secrets.GITHUB_TOKEN }}
-      - uses: terraform-docs/gh-actions@v1
-        with:
-          working-dir: .
-          output-file: README.md
-          output-method: inject
-          git-push: true
-          git-push-user-name: github-actions[bot]
-          git-push-user-email: github-actions[bot]@users.noreply.github.com
-          git-commit-message: "docs: auto-update terraform-docs [skip ci]"
-
-  conftest:
-    name: conftest OPA
-    needs: validate
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ vars.AWS_OIDC_ROLE_ARN }}
-          aws-region: ap-south-1
-
-      - uses: hashicorp/setup-terraform@v3
-        with: { terraform_version: "~1.8" }
-
-      - name: Install conftest
-        run: |
-          curl -sSLo conftest.tar.gz \
-            https://github.com/open-policy-agent/conftest/releases/download/v0.46.0/conftest_0.46.0_Linux_x86_64.tar.gz
-          tar -xzf conftest.tar.gz conftest
-          mv conftest /usr/local/bin/
-
-      - name: Generate plan JSON
-        run: |
-          terraform init -backend=false
-          terraform plan -out=tfplan.binary \
-            -var="name=ci" \
-            -var='cidr_block=10.0.0.0/16' \
-            -var='availability_zones=["ap-south-1a","ap-south-1b"]' \
-            -var='public_subnet_cidrs=["10.0.0.0/24","10.0.1.0/24"]' \
-            -var='private_subnet_cidrs=["10.0.10.0/24","10.0.11.0/24"]'
-          terraform show -json tfplan.binary > tfplan.json
-
-      - name: Run conftest
-        run: conftest test tfplan.json --policy .opa/ --all-namespaces
-
-  # FIX: contract tests now check resource counts (known at plan time)
-  # not output values (unknown until apply)
-  terraform_test:
-    name: terraform test (unit + contract)
-    needs: validate
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: hashicorp/setup-terraform@v3
-        with: { terraform_version: "~1.8" }
-      - run: terraform init -backend=false
-      - run: terraform test -filter=tests/unit.tftest.hcl
-      - run: terraform test -filter=tests/contract.tftest.hcl
-
-  checkov:
-    name: checkov (inform)
-    needs: validate
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: bridgecrewio/checkov-action@v12
-        with:
-          directory: .
-          framework: terraform
-          output_format: cli,sarif
-          output_file_path: console,checkov.sarif
-          soft_fail: true
-
-  infracost:
-    name: infracost (inform)
-    needs: validate
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      pull-requests: write
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Check API key
-        id: check_key
-        run: |
-          if [ -z "${{ secrets.INFRACOST_API_KEY }}" ]; then
-            echo "skip=true" >> $GITHUB_OUTPUT
-            echo "INFRACOST_API_KEY not set — skipping"
-          else
-            echo "skip=false" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Setup Infracost
-        if: steps.check_key.outputs.skip == 'false'
-        uses: infracost/actions/setup@v3
-        with:
-          api-key: ${{ secrets.INFRACOST_API_KEY }}
-
-      - name: Run Infracost diff
-        if: steps.check_key.outputs.skip == 'false'
-        run: |
-          infracost diff \
-            --path=. \
-            --format=json \
-            --out-file=/tmp/infracost.json \
-            --terraform-var="name=ci" \
-            --terraform-var="cidr_block=10.0.0.0/16" || true
-
-      - name: Post Infracost comment
-        if: steps.check_key.outputs.skip == 'false' && github.event_name == 'pull_request'
-        run: |
-          infracost comment github \
-            --path=/tmp/infracost.json \
-            --repo=${{ github.repository }} \
-            --pull-request=${{ github.event.pull_request.number }} \
-            --github-token=${{ secrets.GITHUB_TOKEN }} \
-            --behavior=update
-
-  examples_build:
-    name: examples build
-    needs: validate
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        example: [basic, complete]
-    steps:
-      - uses: actions/checkout@v4
-      - uses: hashicorp/setup-terraform@v3
-        with: { terraform_version: "~1.8" }
-      - run: terraform init -backend=false
-        working-directory: examples/${{ matrix.example }}
-      - run: terraform validate
-        working-directory: examples/${{ matrix.example }}
-
-  # ── Branch protection gate ─────────────────────────────────────────────
-  all_green:
-    name: all checks green
-    needs: [tflint, tfsec, gitleaks, terraform_docs, conftest, terraform_test, checkov, infracost, examples_build]
-    runs-on: ubuntu-latest
-    steps:
-      - run: echo "All CI checks passed."
+  ci:
+    uses: devotica-labs/terraform-shared-config/.github/workflows/terraform-module-ci.yml@v1
+    with:
+      terraform-version: "1.9.5"
+      working-directory: "."
+      terraform-docs-auto-update: true   # bot keeps README in sync on PRs
+    secrets: inherit
