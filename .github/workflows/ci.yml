@@ -1,7 +1,7 @@
 # ---------------------------------------------------------------------------
 # CI for terraform-aws-vpc — uses the central reusable workflow from
 # devotica-labs/terraform-shared-config so every module repo enforces the
-# same standard (fmt, validate, tflint, trivy, gitleaks, terraform-docs,
+# same standard (fmt, validate, tflint, tfsec, gitleaks, terraform-docs,
 # conftest against the central terraform-policies pack, terraform test,
 # checkov, examples build).
 #
@@ -20,7 +20,7 @@ on:
     branches: [main]
 
 permissions:
-  contents: write       # terraform-docs auto-update pushes back on PRs
+  contents: read
   pull-requests: write
   id-token: write
 
@@ -30,5 +30,4 @@ jobs:
     with:
       terraform-version: "1.9.5"
       working-directory: "."
-      terraform-docs-auto-update: true   # bot keeps README in sync on PRs
     secrets: inherit
