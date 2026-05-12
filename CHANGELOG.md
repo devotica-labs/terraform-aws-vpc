@@ -3,6 +3,14 @@
 Managed by [release-please](https://github.com/googleapis/release-please).
 Do not edit manually — use Conventional Commits in PR titles.
 
+## [0.4.3](https://github.com/devotica-labs/terraform-aws-vpc/compare/v0.4.2...v0.4.3) (2026-05-12)
+
+
+### Bug Fixes
+
+* **examples:** add Foundation Plan §15.2 six-tag set to module callers ([745102c](https://github.com/devotica-labs/terraform-aws-vpc/commit/745102c3d377142dc35ba276f425c1b67aac3f59))
+* **examples:** add Foundation Plan §15.2 six-tag set to module callers ([9fdebf2](https://github.com/devotica-labs/terraform-aws-vpc/commit/9fdebf2a488e32a6daa48af418bb6b8f67251378))
+
 ## [0.4.2](https://github.com/devotica-labs/terraform-aws-vpc/compare/v0.4.1...v0.4.2) (2026-05-12)
 
 
