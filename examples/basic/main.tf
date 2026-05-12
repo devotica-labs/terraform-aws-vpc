@@ -34,4 +34,15 @@ module "vpc" {
 
   public_subnet_cidrs  = ["10.0.0.0/24", "10.0.1.0/24"]
   private_subnet_cidrs = ["10.0.10.0/24", "10.0.11.0/24"]
+
+  # Foundation Plan §15.2 — six mandatory tags on every resource.
+  # In a real deployment, replace these values with your environment's.
+  tags = {
+    Environment = "example"
+    Project     = "terraform-aws-vpc"
+    Owner       = "platform@devotica.com"
+    CostCenter  = "PLATFORM-OSS"
+    ManagedBy   = "Terraform"
+    Repo        = "https://github.com/devotica-labs/terraform-aws-vpc"
+  }
 }
