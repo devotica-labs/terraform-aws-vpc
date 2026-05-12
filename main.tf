@@ -43,10 +43,16 @@ resource "aws_subnet" "public" {
   availability_zone       = each.key
   map_public_ip_on_launch = false
 
-  tags = merge(local.common_tags, {
-    Name = "${var.name}-public-${each.key}"
-    Tier = "public"
-  })
+  # Module-managed Name + Tier always win over consumer-supplied tags
+  # (consumers shouldn't override them — they're the contract).
+  tags = merge(
+    local.common_tags,
+    var.public_subnet_tags,
+    {
+      Name = "${var.name}-public-${each.key}"
+      Tier = "public"
+    },
+  )
 }
 
 # ---------------------------------------------------------------------------
@@ -60,10 +66,14 @@ resource "aws_subnet" "private" {
   cidr_block        = each.value
   availability_zone = each.key
 
-  tags = merge(local.common_tags, {
-    Name = "${var.name}-private-${each.key}"
-    Tier = "private"
-  })
+  tags = merge(
+    local.common_tags,
+    var.private_subnet_tags,
+    {
+      Name = "${var.name}-private-${each.key}"
+      Tier = "private"
+    },
+  )
 }
 
 # ---------------------------------------------------------------------------
@@ -142,25 +152,110 @@ resource "aws_route_table_association" "private" {
 }
 
 # ---------------------------------------------------------------------------
+# Gateway VPC Endpoints — S3 and DynamoDB.
+#
+# Both are FREE (no per-hour, no per-GB) and attach to every private route
+# table. Traffic to s3:* and dynamodb:* from private subnets stops paying
+# NAT egress fees the moment these are enabled. No-op for public subnets
+# (they have IGW egress).
+# ---------------------------------------------------------------------------
+
+resource "aws_vpc_endpoint" "s3" {
+  count             = var.enable_s3_gateway_endpoint ? 1 : 0
+  vpc_id            = aws_vpc.this.id
+  service_name      = "com.amazonaws.${data.aws_region.current.region}.s3"
+  vpc_endpoint_type = "Gateway"
+  route_table_ids   = [for rt in aws_route_table.private : rt.id]
+  tags              = merge(local.common_tags, { Name = "${var.name}-s3-endpoint" })
+}
+
+resource "aws_vpc_endpoint" "dynamodb" {
+  count             = var.enable_dynamodb_gateway_endpoint ? 1 : 0
+  vpc_id            = aws_vpc.this.id
+  service_name      = "com.amazonaws.${data.aws_region.current.region}.dynamodb"
+  vpc_endpoint_type = "Gateway"
+  route_table_ids   = [for rt in aws_route_table.private : rt.id]
+  tags              = merge(local.common_tags, { Name = "${var.name}-dynamodb-endpoint" })
+}
+
+# ---------------------------------------------------------------------------
+# Additional public routes — Transit Gateway, peering, VPN, IPv6 default,
+# etc. Indexed by list position; one route per public RT (there's only one).
+# ---------------------------------------------------------------------------
+
+resource "aws_route" "public_additional" {
+  count = length(local.public_subnet_map) > 0 ? length(var.additional_public_routes) : 0
+
+  route_table_id              = aws_route_table.public[0].id
+  destination_cidr_block      = var.additional_public_routes[count.index].destination_cidr_block
+  destination_ipv6_cidr_block = var.additional_public_routes[count.index].destination_ipv6_cidr_block
+  transit_gateway_id          = var.additional_public_routes[count.index].transit_gateway_id
+  vpc_peering_connection_id   = var.additional_public_routes[count.index].vpc_peering_connection_id
+  gateway_id                  = var.additional_public_routes[count.index].gateway_id
+  nat_gateway_id              = var.additional_public_routes[count.index].nat_gateway_id
+  network_interface_id        = var.additional_public_routes[count.index].network_interface_id
+  vpc_endpoint_id             = var.additional_public_routes[count.index].vpc_endpoint_id
+}
+
+# ---------------------------------------------------------------------------
+# Additional private routes — applied to EVERY private route table (one
+# per AZ). Keyed by "<az>-<index>" so terraform plans are stable under
+# AZ list reordering AND under additional_private_routes reordering.
+# ---------------------------------------------------------------------------
+
+resource "aws_route" "private_additional" {
+  for_each = {
+    for pair in flatten([
+      for az in keys(local.private_subnet_map) : [
+        for i, route in var.additional_private_routes : {
+          key   = "${az}-${i}"
+          az    = az
+          route = route
+        }
+      ]
+    ]) : pair.key => pair
+  }
+
+  route_table_id              = aws_route_table.private[each.value.az].id
+  destination_cidr_block      = each.value.route.destination_cidr_block
+  destination_ipv6_cidr_block = each.value.route.destination_ipv6_cidr_block
+  transit_gateway_id          = each.value.route.transit_gateway_id
+  vpc_peering_connection_id   = each.value.route.vpc_peering_connection_id
+  gateway_id                  = each.value.route.gateway_id
+  nat_gateway_id              = each.value.route.nat_gateway_id
+  network_interface_id        = each.value.route.network_interface_id
+  vpc_endpoint_id             = each.value.route.vpc_endpoint_id
+}
+
+# ---------------------------------------------------------------------------
 # VPC Flow Logs
 # ---------------------------------------------------------------------------
 
+# CloudWatch Logs destination — created only when destination_type = 'cloud-watch-logs'.
+# When destination_type = 's3' the consumer's pre-existing S3 bucket is the target
+# and no CloudWatch group / IAM role is needed (S3 destination uses a bucket policy
+# instead of an assumed role).
+locals {
+  flow_logs_to_cloudwatch = var.enable_flow_logs && var.flow_logs_destination_type == "cloud-watch-logs"
+  flow_logs_to_s3         = var.enable_flow_logs && var.flow_logs_destination_type == "s3"
+}
+
 resource "aws_cloudwatch_log_group" "flow_logs" {
-  count             = var.enable_flow_logs ? 1 : 0
+  count             = local.flow_logs_to_cloudwatch ? 1 : 0
   name              = local.flow_log_group_name
   retention_in_days = var.flow_logs_retention_days
   tags              = merge(local.common_tags, { Name = local.flow_log_group_name })
 }
 
 resource "aws_iam_role" "flow_logs" {
-  count              = var.enable_flow_logs ? 1 : 0
+  count              = local.flow_logs_to_cloudwatch ? 1 : 0
   name_prefix        = "${var.name}-vpc-flow-logs-"
   assume_role_policy = data.aws_iam_policy_document.flow_logs_assume[0].json
   tags               = local.common_tags
 }
 
 data "aws_iam_policy_document" "flow_logs_assume" {
-  count = var.enable_flow_logs ? 1 : 0
+  count = local.flow_logs_to_cloudwatch ? 1 : 0
   statement {
     effect  = "Allow"
     actions = ["sts:AssumeRole"]
@@ -172,14 +267,14 @@ data "aws_iam_policy_document" "flow_logs_assume" {
 }
 
 resource "aws_iam_role_policy" "flow_logs" {
-  count       = var.enable_flow_logs ? 1 : 0
+  count       = local.flow_logs_to_cloudwatch ? 1 : 0
   name_prefix = "${var.name}-vpc-flow-logs-"
   role        = aws_iam_role.flow_logs[0].id
   policy      = data.aws_iam_policy_document.flow_logs_publish[0].json
 }
 
 data "aws_iam_policy_document" "flow_logs_publish" {
-  count = var.enable_flow_logs ? 1 : 0
+  count = local.flow_logs_to_cloudwatch ? 1 : 0
   statement {
     effect = "Allow"
     actions = [
@@ -191,10 +286,25 @@ data "aws_iam_policy_document" "flow_logs_publish" {
 }
 
 resource "aws_flow_log" "this" {
-  count           = var.enable_flow_logs ? 1 : 0
-  vpc_id          = aws_vpc.this.id
-  traffic_type    = var.flow_logs_traffic_type
-  iam_role_arn    = aws_iam_role.flow_logs[0].arn
-  log_destination = aws_cloudwatch_log_group.flow_logs[0].arn
-  tags            = merge(local.common_tags, { Name = "${var.name}-flow-log" })
+  count = var.enable_flow_logs ? 1 : 0
+
+  vpc_id               = aws_vpc.this.id
+  traffic_type         = var.flow_logs_traffic_type
+  log_destination_type = var.flow_logs_destination_type
+  log_destination      = local.flow_logs_to_s3 ? var.flow_logs_s3_bucket_arn : aws_cloudwatch_log_group.flow_logs[0].arn
+  # IAM role is required for CloudWatch destination, must be null for S3
+  # destination (S3 uses bucket policy auth instead).
+  iam_role_arn = local.flow_logs_to_cloudwatch ? aws_iam_role.flow_logs[0].arn : null
+  # Custom log format (v5+ fields) when set; AWS default v2 format otherwise.
+  log_format = length(var.flow_logs_custom_format) > 0 ? var.flow_logs_custom_format : null
+  tags       = merge(local.common_tags, { Name = "${var.name}-flow-log" })
+
+  lifecycle {
+    # Fails fast at plan time with a clear message rather than letting the
+    # API call go through and surface a less specific error.
+    precondition {
+      condition     = var.flow_logs_destination_type != "s3" || length(var.flow_logs_s3_bucket_arn) > 0
+      error_message = "flow_logs_s3_bucket_arn must be set when flow_logs_destination_type = 's3'."
+    }
+  }
 }

@@ -106,7 +106,7 @@ variable "enable_flow_logs" {
 }
 
 variable "flow_logs_retention_days" {
-  description = "CloudWatch Logs retention period for flow log entries."
+  description = "CloudWatch Logs retention period for flow log entries. Ignored when flow_logs_destination_type = 's3'."
   type        = number
   default     = 30
   validation {
@@ -128,6 +128,28 @@ variable "flow_logs_traffic_type" {
   }
 }
 
+variable "flow_logs_destination_type" {
+  description = "Where to ship VPC Flow Logs. 'cloud-watch-logs' (default) bills by ingestion + storage and integrates with CloudWatch Insights. 's3' is much cheaper for long retention (months/years) and is AWS's recommended destination for compliance / audit workloads."
+  type        = string
+  default     = "cloud-watch-logs"
+  validation {
+    condition     = contains(["cloud-watch-logs", "s3"], var.flow_logs_destination_type)
+    error_message = "flow_logs_destination_type must be 'cloud-watch-logs' or 's3'."
+  }
+}
+
+variable "flow_logs_s3_bucket_arn" {
+  description = "ARN of the S3 bucket (optionally with /prefix) to receive flow logs. Required when flow_logs_destination_type = 's3'; ignored otherwise. The bucket must already exist and have an S3 bucket policy allowing the VPC Flow Logs service."
+  type        = string
+  default     = ""
+}
+
+variable "flow_logs_custom_format" {
+  description = "Custom log format string for VPC Flow Logs. Empty (default) uses the AWS default v2 format. Set to enable v5+ fields (pkt-srcaddr, pkt-dstaddr, vpc-id, az-id, sublocation-type, tcp-flags, traffic-path, etc.) — needed for fintech-grade audit, RBI/PCI traffic forensics, and ECMP/multi-path debugging. See https://docs.aws.amazon.com/vpc/latest/userguide/flow-logs.html#flow-log-records for the supported field list."
+  type        = string
+  default     = ""
+}
+
 # ---------------------------------------------------------------------------
 # CIS hardening
 # ---------------------------------------------------------------------------
@@ -139,11 +161,82 @@ variable "manage_default_security_group" {
 }
 
 # ---------------------------------------------------------------------------
+# VPC Endpoints — Gateway type (free; S3 + DynamoDB).
+#
+# Interface endpoints (SSM, ECR, KMS, etc.) cost ~$7/month per endpoint per AZ
+# and are out of scope for this module — use a dedicated terraform-aws-vpc-
+# endpoints module when you need them.
+# ---------------------------------------------------------------------------
+
+variable "enable_s3_gateway_endpoint" {
+  description = "Create a free S3 gateway VPC endpoint attached to every private route table. Removes NAT charges for S3 traffic from private subnets."
+  type        = bool
+  default     = false
+}
+
+variable "enable_dynamodb_gateway_endpoint" {
+  description = "Create a free DynamoDB gateway VPC endpoint attached to every private route table. Removes NAT charges for DynamoDB traffic from private subnets."
+  type        = bool
+  default     = false
+}
+
+# ---------------------------------------------------------------------------
+# Custom routes — beyond the built-in 0.0.0.0/0 → IGW (public) and
+# 0.0.0.0/0 → NAT (private). Use for Transit Gateway, VPC peering, VPN,
+# or IPv6 default routes.
+#
+# Each entry must specify exactly one destination_* and exactly one target.
+# Terraform will reject ambiguous combinations at apply time.
+# ---------------------------------------------------------------------------
+
+variable "additional_public_routes" {
+  description = "Custom routes added to the shared public route table beyond 0.0.0.0/0 → IGW. Each entry: one destination + one target."
+  type = list(object({
+    destination_cidr_block      = optional(string)
+    destination_ipv6_cidr_block = optional(string)
+    transit_gateway_id          = optional(string)
+    vpc_peering_connection_id   = optional(string)
+    gateway_id                  = optional(string)
+    nat_gateway_id              = optional(string)
+    network_interface_id        = optional(string)
+    vpc_endpoint_id             = optional(string)
+  }))
+  default = []
+}
+
+variable "additional_private_routes" {
+  description = "Custom routes added to EVERY private route table (one per AZ). Each entry: one destination + one target. Same field shape as additional_public_routes."
+  type = list(object({
+    destination_cidr_block      = optional(string)
+    destination_ipv6_cidr_block = optional(string)
+    transit_gateway_id          = optional(string)
+    vpc_peering_connection_id   = optional(string)
+    gateway_id                  = optional(string)
+    nat_gateway_id              = optional(string)
+    network_interface_id        = optional(string)
+    vpc_endpoint_id             = optional(string)
+  }))
+  default = []
+}
+
+# ---------------------------------------------------------------------------
 # Tagging
 # ---------------------------------------------------------------------------
 
 variable "tags" {
   description = "Additional tags merged onto every taggable resource."
+  type        = map(string)
+  default     = {}
+}
+
+variable "public_subnet_tags" {
+  description = "Tags applied ONLY to public subnets, in addition to var.tags. Common use: EKS ELB discovery — set {\"kubernetes.io/role/elb\" = \"1\"}."
+  type        = map(string)
+  default     = {}
+}
+
+variable "private_subnet_tags" {
+  description = "Tags applied ONLY to private subnets, in addition to var.tags. Common use: EKS internal-ELB discovery — set {\"kubernetes.io/role/internal-elb\" = \"1\"}."
   type        = map(string)
   default     = {}
 }
