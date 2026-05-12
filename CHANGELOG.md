@@ -3,6 +3,14 @@
 Managed by [release-please](https://github.com/googleapis/release-please).
 Do not edit manually — use Conventional Commits in PR titles.
 
+## [0.5.0](https://github.com/devotica-labs/terraform-aws-vpc/compare/v0.4.3...v0.5.0) (2026-05-12)
+
+
+### Features
+
+* **docs:** auto-generate AWS architecture diagram from terraform plan ([78dc53c](https://github.com/devotica-labs/terraform-aws-vpc/commit/78dc53c92c6fb9d92e9d979d16c77cd1ccd8b746))
+* **docs:** auto-generate AWS architecture diagram from terraform plan ([f854009](https://github.com/devotica-labs/terraform-aws-vpc/commit/f8540098c96f6e5a4e05ad29011ecbc291ddca7b))
+
 ## [0.4.3](https://github.com/devotica-labs/terraform-aws-vpc/compare/v0.4.2...v0.4.3) (2026-05-12)
 
 
