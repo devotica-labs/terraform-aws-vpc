@@ -3,6 +3,13 @@
 Managed by [release-please](https://github.com/googleapis/release-please).
 Do not edit manually — use Conventional Commits in PR titles.
 
+## [0.4.2](https://github.com/devotica-labs/terraform-aws-vpc/compare/v0.4.1...v0.4.2) (2026-05-12)
+
+
+### Bug Fixes
+
+* **examples:** add provider 'aws' block with skip_* flags + placeholder creds ([a359ff4](https://github.com/devotica-labs/terraform-aws-vpc/commit/a359ff4b0c1cd4d252f4d0baeefb2b345565d24c))
+
 ## [0.4.1](https://github.com/devotica-labs/terraform-aws-vpc/compare/v0.4.0...v0.4.1) (2026-05-12)
 
 
