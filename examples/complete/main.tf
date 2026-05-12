@@ -49,10 +49,13 @@ module "vpc" {
 
   manage_default_security_group = true
 
+  # Foundation Plan §15.2 — six mandatory tags on every resource.
   tags = {
     Environment = "production"
     Project     = "sample"
-    CostCenter  = "platform"
     Owner       = "cloud-team@example.com"
+    CostCenter  = "platform"
+    ManagedBy   = "Terraform"
+    Repo        = "https://github.com/devotica-labs/terraform-aws-vpc"
   }
 }
