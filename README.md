@@ -69,7 +69,7 @@ provider "aws" {
 # Uses local path during development.
 # Change to Registry source after first release:
 #   source  = "devotica-labs/vpc/aws"
-#   version = "~> 0.5"
+#   version = "~> 0.6"
 
 module "vpc" {
   source = "../.."
