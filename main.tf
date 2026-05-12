@@ -142,6 +142,55 @@ resource "aws_route_table_association" "private" {
 }
 
 # ---------------------------------------------------------------------------
+# Additional public routes — Transit Gateway, peering, VPN, IPv6 default,
+# etc. Indexed by list position; one route per public RT (there's only one).
+# ---------------------------------------------------------------------------
+
+resource "aws_route" "public_additional" {
+  count = length(local.public_subnet_map) > 0 ? length(var.additional_public_routes) : 0
+
+  route_table_id              = aws_route_table.public[0].id
+  destination_cidr_block      = var.additional_public_routes[count.index].destination_cidr_block
+  destination_ipv6_cidr_block = var.additional_public_routes[count.index].destination_ipv6_cidr_block
+  transit_gateway_id          = var.additional_public_routes[count.index].transit_gateway_id
+  vpc_peering_connection_id   = var.additional_public_routes[count.index].vpc_peering_connection_id
+  gateway_id                  = var.additional_public_routes[count.index].gateway_id
+  nat_gateway_id              = var.additional_public_routes[count.index].nat_gateway_id
+  network_interface_id        = var.additional_public_routes[count.index].network_interface_id
+  vpc_endpoint_id             = var.additional_public_routes[count.index].vpc_endpoint_id
+}
+
+# ---------------------------------------------------------------------------
+# Additional private routes — applied to EVERY private route table (one
+# per AZ). Keyed by "<az>-<index>" so terraform plans are stable under
+# AZ list reordering AND under additional_private_routes reordering.
+# ---------------------------------------------------------------------------
+
+resource "aws_route" "private_additional" {
+  for_each = {
+    for pair in flatten([
+      for az in keys(local.private_subnet_map) : [
+        for i, route in var.additional_private_routes : {
+          key   = "${az}-${i}"
+          az    = az
+          route = route
+        }
+      ]
+    ]) : pair.key => pair
+  }
+
+  route_table_id              = aws_route_table.private[each.value.az].id
+  destination_cidr_block      = each.value.route.destination_cidr_block
+  destination_ipv6_cidr_block = each.value.route.destination_ipv6_cidr_block
+  transit_gateway_id          = each.value.route.transit_gateway_id
+  vpc_peering_connection_id   = each.value.route.vpc_peering_connection_id
+  gateway_id                  = each.value.route.gateway_id
+  nat_gateway_id              = each.value.route.nat_gateway_id
+  network_interface_id        = each.value.route.network_interface_id
+  vpc_endpoint_id             = each.value.route.vpc_endpoint_id
+}
+
+# ---------------------------------------------------------------------------
 # VPC Flow Logs
 # ---------------------------------------------------------------------------
 

@@ -139,6 +139,45 @@ variable "manage_default_security_group" {
 }
 
 # ---------------------------------------------------------------------------
+# Custom routes — beyond the built-in 0.0.0.0/0 → IGW (public) and
+# 0.0.0.0/0 → NAT (private). Use for Transit Gateway, VPC peering, VPN,
+# or IPv6 default routes.
+#
+# Each entry must specify exactly one destination_* and exactly one target.
+# Terraform will reject ambiguous combinations at apply time.
+# ---------------------------------------------------------------------------
+
+variable "additional_public_routes" {
+  description = "Custom routes added to the shared public route table beyond 0.0.0.0/0 → IGW. Each entry: one destination + one target."
+  type = list(object({
+    destination_cidr_block      = optional(string)
+    destination_ipv6_cidr_block = optional(string)
+    transit_gateway_id          = optional(string)
+    vpc_peering_connection_id   = optional(string)
+    gateway_id                  = optional(string)
+    nat_gateway_id              = optional(string)
+    network_interface_id        = optional(string)
+    vpc_endpoint_id             = optional(string)
+  }))
+  default = []
+}
+
+variable "additional_private_routes" {
+  description = "Custom routes added to EVERY private route table (one per AZ). Each entry: one destination + one target. Same field shape as additional_public_routes."
+  type = list(object({
+    destination_cidr_block      = optional(string)
+    destination_ipv6_cidr_block = optional(string)
+    transit_gateway_id          = optional(string)
+    vpc_peering_connection_id   = optional(string)
+    gateway_id                  = optional(string)
+    nat_gateway_id              = optional(string)
+    network_interface_id        = optional(string)
+    vpc_endpoint_id             = optional(string)
+  }))
+  default = []
+}
+
+# ---------------------------------------------------------------------------
 # Tagging
 # ---------------------------------------------------------------------------
 
