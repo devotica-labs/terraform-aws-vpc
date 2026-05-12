@@ -222,3 +222,15 @@ variable "tags" {
   type        = map(string)
   default     = {}
 }
+
+variable "public_subnet_tags" {
+  description = "Tags applied ONLY to public subnets, in addition to var.tags. Common use: EKS ELB discovery — set {\"kubernetes.io/role/elb\" = \"1\"}."
+  type        = map(string)
+  default     = {}
+}
+
+variable "private_subnet_tags" {
+  description = "Tags applied ONLY to private subnets, in addition to var.tags. Common use: EKS internal-ELB discovery — set {\"kubernetes.io/role/internal-elb\" = \"1\"}."
+  type        = map(string)
+  default     = {}
+}

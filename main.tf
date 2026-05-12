@@ -43,10 +43,16 @@ resource "aws_subnet" "public" {
   availability_zone       = each.key
   map_public_ip_on_launch = false
 
-  tags = merge(local.common_tags, {
-    Name = "${var.name}-public-${each.key}"
-    Tier = "public"
-  })
+  # Module-managed Name + Tier always win over consumer-supplied tags
+  # (consumers shouldn't override them — they're the contract).
+  tags = merge(
+    local.common_tags,
+    var.public_subnet_tags,
+    {
+      Name = "${var.name}-public-${each.key}"
+      Tier = "public"
+    },
+  )
 }
 
 # ---------------------------------------------------------------------------
@@ -60,10 +66,14 @@ resource "aws_subnet" "private" {
   cidr_block        = each.value
   availability_zone = each.key
 
-  tags = merge(local.common_tags, {
-    Name = "${var.name}-private-${each.key}"
-    Tier = "private"
-  })
+  tags = merge(
+    local.common_tags,
+    var.private_subnet_tags,
+    {
+      Name = "${var.name}-private-${each.key}"
+      Tier = "private"
+    },
+  )
 }
 
 # ---------------------------------------------------------------------------
