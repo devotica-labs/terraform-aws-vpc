@@ -163,7 +163,7 @@ resource "aws_route_table_association" "private" {
 resource "aws_vpc_endpoint" "s3" {
   count             = var.enable_s3_gateway_endpoint ? 1 : 0
   vpc_id            = aws_vpc.this.id
-  service_name      = "com.amazonaws.${data.aws_region.current.name}.s3"
+  service_name      = "com.amazonaws.${data.aws_region.current.region}.s3"
   vpc_endpoint_type = "Gateway"
   route_table_ids   = [for rt in aws_route_table.private : rt.id]
   tags              = merge(local.common_tags, { Name = "${var.name}-s3-endpoint" })
@@ -172,7 +172,7 @@ resource "aws_vpc_endpoint" "s3" {
 resource "aws_vpc_endpoint" "dynamodb" {
   count             = var.enable_dynamodb_gateway_endpoint ? 1 : 0
   vpc_id            = aws_vpc.this.id
-  service_name      = "com.amazonaws.${data.aws_region.current.name}.dynamodb"
+  service_name      = "com.amazonaws.${data.aws_region.current.region}.dynamodb"
   vpc_endpoint_type = "Gateway"
   route_table_ids   = [for rt in aws_route_table.private : rt.id]
   tags              = merge(local.common_tags, { Name = "${var.name}-dynamodb-endpoint" })
