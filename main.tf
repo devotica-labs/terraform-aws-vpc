@@ -221,22 +221,31 @@ resource "aws_route" "private_additional" {
 # VPC Flow Logs
 # ---------------------------------------------------------------------------
 
+# CloudWatch Logs destination — created only when destination_type = 'cloud-watch-logs'.
+# When destination_type = 's3' the consumer's pre-existing S3 bucket is the target
+# and no CloudWatch group / IAM role is needed (S3 destination uses a bucket policy
+# instead of an assumed role).
+locals {
+  flow_logs_to_cloudwatch = var.enable_flow_logs && var.flow_logs_destination_type == "cloud-watch-logs"
+  flow_logs_to_s3         = var.enable_flow_logs && var.flow_logs_destination_type == "s3"
+}
+
 resource "aws_cloudwatch_log_group" "flow_logs" {
-  count             = var.enable_flow_logs ? 1 : 0
+  count             = local.flow_logs_to_cloudwatch ? 1 : 0
   name              = local.flow_log_group_name
   retention_in_days = var.flow_logs_retention_days
   tags              = merge(local.common_tags, { Name = local.flow_log_group_name })
 }
 
 resource "aws_iam_role" "flow_logs" {
-  count              = var.enable_flow_logs ? 1 : 0
+  count              = local.flow_logs_to_cloudwatch ? 1 : 0
   name_prefix        = "${var.name}-vpc-flow-logs-"
   assume_role_policy = data.aws_iam_policy_document.flow_logs_assume[0].json
   tags               = local.common_tags
 }
 
 data "aws_iam_policy_document" "flow_logs_assume" {
-  count = var.enable_flow_logs ? 1 : 0
+  count = local.flow_logs_to_cloudwatch ? 1 : 0
   statement {
     effect  = "Allow"
     actions = ["sts:AssumeRole"]
@@ -248,14 +257,14 @@ data "aws_iam_policy_document" "flow_logs_assume" {
 }
 
 resource "aws_iam_role_policy" "flow_logs" {
-  count       = var.enable_flow_logs ? 1 : 0
+  count       = local.flow_logs_to_cloudwatch ? 1 : 0
   name_prefix = "${var.name}-vpc-flow-logs-"
   role        = aws_iam_role.flow_logs[0].id
   policy      = data.aws_iam_policy_document.flow_logs_publish[0].json
 }
 
 data "aws_iam_policy_document" "flow_logs_publish" {
-  count = var.enable_flow_logs ? 1 : 0
+  count = local.flow_logs_to_cloudwatch ? 1 : 0
   statement {
     effect = "Allow"
     actions = [
@@ -267,10 +276,23 @@ data "aws_iam_policy_document" "flow_logs_publish" {
 }
 
 resource "aws_flow_log" "this" {
-  count           = var.enable_flow_logs ? 1 : 0
-  vpc_id          = aws_vpc.this.id
-  traffic_type    = var.flow_logs_traffic_type
-  iam_role_arn    = aws_iam_role.flow_logs[0].arn
-  log_destination = aws_cloudwatch_log_group.flow_logs[0].arn
-  tags            = merge(local.common_tags, { Name = "${var.name}-flow-log" })
+  count = var.enable_flow_logs ? 1 : 0
+
+  vpc_id               = aws_vpc.this.id
+  traffic_type         = var.flow_logs_traffic_type
+  log_destination_type = var.flow_logs_destination_type
+  log_destination      = local.flow_logs_to_s3 ? var.flow_logs_s3_bucket_arn : aws_cloudwatch_log_group.flow_logs[0].arn
+  # IAM role is required for CloudWatch destination, must be null for S3
+  # destination (S3 uses bucket policy auth instead).
+  iam_role_arn = local.flow_logs_to_cloudwatch ? aws_iam_role.flow_logs[0].arn : null
+  tags         = merge(local.common_tags, { Name = "${var.name}-flow-log" })
+
+  lifecycle {
+    # Fails fast at plan time with a clear message rather than letting the
+    # API call go through and surface a less specific error.
+    precondition {
+      condition     = var.flow_logs_destination_type != "s3" || length(var.flow_logs_s3_bucket_arn) > 0
+      error_message = "flow_logs_s3_bucket_arn must be set when flow_logs_destination_type = 's3'."
+    }
+  }
 }

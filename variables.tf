@@ -106,7 +106,7 @@ variable "enable_flow_logs" {
 }
 
 variable "flow_logs_retention_days" {
-  description = "CloudWatch Logs retention period for flow log entries."
+  description = "CloudWatch Logs retention period for flow log entries. Ignored when flow_logs_destination_type = 's3'."
   type        = number
   default     = 30
   validation {
@@ -126,6 +126,22 @@ variable "flow_logs_traffic_type" {
     condition     = contains(["ACCEPT", "REJECT", "ALL"], var.flow_logs_traffic_type)
     error_message = "flow_logs_traffic_type must be ACCEPT, REJECT, or ALL."
   }
+}
+
+variable "flow_logs_destination_type" {
+  description = "Where to ship VPC Flow Logs. 'cloud-watch-logs' (default) bills by ingestion + storage and integrates with CloudWatch Insights. 's3' is much cheaper for long retention (months/years) and is AWS's recommended destination for compliance / audit workloads."
+  type        = string
+  default     = "cloud-watch-logs"
+  validation {
+    condition     = contains(["cloud-watch-logs", "s3"], var.flow_logs_destination_type)
+    error_message = "flow_logs_destination_type must be 'cloud-watch-logs' or 's3'."
+  }
+}
+
+variable "flow_logs_s3_bucket_arn" {
+  description = "ARN of the S3 bucket (optionally with /prefix) to receive flow logs. Required when flow_logs_destination_type = 's3'; ignored otherwise. The bucket must already exist and have an S3 bucket policy allowing the VPC Flow Logs service."
+  type        = string
+  default     = ""
 }
 
 # ---------------------------------------------------------------------------
