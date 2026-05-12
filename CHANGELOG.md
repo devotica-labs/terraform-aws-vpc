@@ -3,6 +3,14 @@
 Managed by [release-please](https://github.com/googleapis/release-please).
 Do not edit manually — use Conventional Commits in PR titles.
 
+## [0.4.1](https://github.com/devotica-labs/terraform-aws-vpc/compare/v0.4.0...v0.4.1) (2026-05-12)
+
+
+### Bug Fixes
+
+* **examples:** bump AWS provider constraint to ~&gt; 6.44 to match module ([7b20d23](https://github.com/devotica-labs/terraform-aws-vpc/commit/7b20d23131f5b3f951e05f204ddda9dd3fe9d37c))
+* **examples:** bump AWS provider constraint to ~&gt; 6.44 to match module ([6831c82](https://github.com/devotica-labs/terraform-aws-vpc/commit/6831c8213bc68501797d0a518587f343d47bb882))
+
 ## [0.4.0](https://github.com/devotica-labs/terraform-aws-vpc/compare/v0.3.0...v0.4.0) (2026-05-12)
 
 
