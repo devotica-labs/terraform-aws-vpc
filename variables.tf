@@ -144,6 +144,12 @@ variable "flow_logs_s3_bucket_arn" {
   default     = ""
 }
 
+variable "flow_logs_custom_format" {
+  description = "Custom log format string for VPC Flow Logs. Empty (default) uses the AWS default v2 format. Set to enable v5+ fields (pkt-srcaddr, pkt-dstaddr, vpc-id, az-id, sublocation-type, tcp-flags, traffic-path, etc.) — needed for fintech-grade audit, RBI/PCI traffic forensics, and ECMP/multi-path debugging. See https://docs.aws.amazon.com/vpc/latest/userguide/flow-logs.html#flow-log-records for the supported field list."
+  type        = string
+  default     = ""
+}
+
 # ---------------------------------------------------------------------------
 # CIS hardening
 # ---------------------------------------------------------------------------

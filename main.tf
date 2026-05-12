@@ -295,7 +295,9 @@ resource "aws_flow_log" "this" {
   # IAM role is required for CloudWatch destination, must be null for S3
   # destination (S3 uses bucket policy auth instead).
   iam_role_arn = local.flow_logs_to_cloudwatch ? aws_iam_role.flow_logs[0].arn : null
-  tags         = merge(local.common_tags, { Name = "${var.name}-flow-log" })
+  # Custom log format (v5+ fields) when set; AWS default v2 format otherwise.
+  log_format = length(var.flow_logs_custom_format) > 0 ? var.flow_logs_custom_format : null
+  tags       = merge(local.common_tags, { Name = "${var.name}-flow-log" })
 
   lifecycle {
     # Fails fast at plan time with a clear message rather than letting the
