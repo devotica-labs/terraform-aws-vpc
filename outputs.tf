@@ -101,3 +101,13 @@ output "flow_log_cloudwatch_log_group_arn" {
   description = "ARN of the CloudWatch Log Group for Flow Logs. Empty string when enable_flow_logs = false."
   value       = length(aws_cloudwatch_log_group.flow_logs) > 0 ? aws_cloudwatch_log_group.flow_logs[0].arn : ""
 }
+
+output "s3_gateway_endpoint_id" {
+  description = "ID of the S3 gateway VPC endpoint. Empty string when enable_s3_gateway_endpoint = false."
+  value       = length(aws_vpc_endpoint.s3) > 0 ? aws_vpc_endpoint.s3[0].id : ""
+}
+
+output "dynamodb_gateway_endpoint_id" {
+  description = "ID of the DynamoDB gateway VPC endpoint. Empty string when enable_dynamodb_gateway_endpoint = false."
+  value       = length(aws_vpc_endpoint.dynamodb) > 0 ? aws_vpc_endpoint.dynamodb[0].id : ""
+}

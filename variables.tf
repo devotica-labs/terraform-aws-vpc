@@ -139,6 +139,26 @@ variable "manage_default_security_group" {
 }
 
 # ---------------------------------------------------------------------------
+# VPC Endpoints — Gateway type (free; S3 + DynamoDB).
+#
+# Interface endpoints (SSM, ECR, KMS, etc.) cost ~$7/month per endpoint per AZ
+# and are out of scope for this module — use a dedicated terraform-aws-vpc-
+# endpoints module when you need them.
+# ---------------------------------------------------------------------------
+
+variable "enable_s3_gateway_endpoint" {
+  description = "Create a free S3 gateway VPC endpoint attached to every private route table. Removes NAT charges for S3 traffic from private subnets."
+  type        = bool
+  default     = false
+}
+
+variable "enable_dynamodb_gateway_endpoint" {
+  description = "Create a free DynamoDB gateway VPC endpoint attached to every private route table. Removes NAT charges for DynamoDB traffic from private subnets."
+  type        = bool
+  default     = false
+}
+
+# ---------------------------------------------------------------------------
 # Custom routes — beyond the built-in 0.0.0.0/0 → IGW (public) and
 # 0.0.0.0/0 → NAT (private). Use for Transit Gateway, VPC peering, VPN,
 # or IPv6 default routes.

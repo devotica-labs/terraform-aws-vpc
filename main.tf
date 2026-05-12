@@ -142,6 +142,33 @@ resource "aws_route_table_association" "private" {
 }
 
 # ---------------------------------------------------------------------------
+# Gateway VPC Endpoints — S3 and DynamoDB.
+#
+# Both are FREE (no per-hour, no per-GB) and attach to every private route
+# table. Traffic to s3:* and dynamodb:* from private subnets stops paying
+# NAT egress fees the moment these are enabled. No-op for public subnets
+# (they have IGW egress).
+# ---------------------------------------------------------------------------
+
+resource "aws_vpc_endpoint" "s3" {
+  count             = var.enable_s3_gateway_endpoint ? 1 : 0
+  vpc_id            = aws_vpc.this.id
+  service_name      = "com.amazonaws.${data.aws_region.current.name}.s3"
+  vpc_endpoint_type = "Gateway"
+  route_table_ids   = [for rt in aws_route_table.private : rt.id]
+  tags              = merge(local.common_tags, { Name = "${var.name}-s3-endpoint" })
+}
+
+resource "aws_vpc_endpoint" "dynamodb" {
+  count             = var.enable_dynamodb_gateway_endpoint ? 1 : 0
+  vpc_id            = aws_vpc.this.id
+  service_name      = "com.amazonaws.${data.aws_region.current.name}.dynamodb"
+  vpc_endpoint_type = "Gateway"
+  route_table_ids   = [for rt in aws_route_table.private : rt.id]
+  tags              = merge(local.common_tags, { Name = "${var.name}-dynamodb-endpoint" })
+}
+
+# ---------------------------------------------------------------------------
 # Additional public routes — Transit Gateway, peering, VPN, IPv6 default,
 # etc. Indexed by list position; one route per public RT (there's only one).
 # ---------------------------------------------------------------------------
