@@ -36,7 +36,7 @@ module "vpc" {
 # Uses local path during development.
 # Change to Registry source after first release:
 #   source  = "devotica-labs/vpc/aws"
-#   version = "~> 0.3"
+#   version = "~> 1.0"
 
 module "vpc" {
   source = "../.."
@@ -96,12 +96,12 @@ module "vpc" {
 | Name | Version |
 |------|---------|
 | <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | >= 1.6.0, < 2.0.0 |
-| <a name="requirement_aws"></a> [aws](#requirement\_aws) | ~> 5.30 |
+| <a name="requirement_aws"></a> [aws](#requirement\_aws) | ~> 6.44 |
 ## Providers
 
 | Name | Version |
 |------|---------|
-| <a name="provider_aws"></a> [aws](#provider\_aws) | ~> 5.30 |
+| <a name="provider_aws"></a> [aws](#provider\_aws) | 6.44.0 |
 ## Resources
 
 | Name | Type |
