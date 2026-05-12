@@ -6,7 +6,16 @@ VPC Flow Logs, CIS-hardened default security group.
 Part of the [Devotica Terraform module catalog](https://registry.terraform.io/modules/devotica-labs).
 
 [![CI](https://github.com/devotica-labs/terraform-aws-vpc/actions/workflows/ci.yml/badge.svg)](https://github.com/devotica-labs/terraform-aws-vpc/actions/workflows/ci.yml)
+[![Architecture](https://github.com/devotica-labs/terraform-aws-vpc/actions/workflows/architecture-diagram.yml/badge.svg)](https://github.com/devotica-labs/terraform-aws-vpc/actions/workflows/architecture-diagram.yml)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
+
+## Architecture
+
+<!-- BEGIN_ARCH -->
+
+_Architecture diagram will appear here after the first merge to main. The [`architecture-diagram.yml`](.github/workflows/architecture-diagram.yml) workflow renders [`docs/architecture.png`](docs/architecture.png) from the Terraform plan against [`examples/complete/`](examples/complete) on every push, using the [`diagrams`](https://github.com/mingrammer/diagrams) Python library with native AWS service icons._
+
+<!-- END_ARCH -->
 
 ## Usage
 
