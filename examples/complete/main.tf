@@ -26,7 +26,8 @@ provider "aws" {
 #   version = "~> 1.0"
 
 module "vpc" {
-  source = "../.."
+  source = "devotica-labs/vpc/aws"
+  version = "~> 1.0"
 
   name = "sample-prod"
 
