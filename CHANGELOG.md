@@ -3,6 +3,22 @@
 Managed by [release-please](https://github.com/googleapis/release-please).
 Do not edit manually — use Conventional Commits in PR titles.
 
+## [0.6.0](https://github.com/devotica-labs/terraform-aws-vpc/compare/v0.5.0...v0.6.0) (2026-05-12)
+
+
+### Features
+
+* **endpoints:** add S3 and DynamoDB gateway VPC endpoints (free, opt-in) ([f4db283](https://github.com/devotica-labs/terraform-aws-vpc/commit/f4db28399a5c52cf0a7b6f2c379e17d37d66ff17))
+* **flow-logs:** custom log format string for fintech audit capture ([96af742](https://github.com/devotica-labs/terraform-aws-vpc/commit/96af742289e0632b47b4069f83931e5c15186b18))
+* **flow-logs:** support S3 destination as alternative to CloudWatch Logs ([d9a9d43](https://github.com/devotica-labs/terraform-aws-vpc/commit/d9a9d432cb6fc47a510c645c1e10ec682c66a65a))
+* **routes:** add additional_public_routes and additional_private_routes inputs ([651d815](https://github.com/devotica-labs/terraform-aws-vpc/commit/651d8150eab92930e9bc52ace8b7c331da4fbdc3))
+* **subnets:** per-tier subnet tags for EKS/ELB discovery ([5b1eaff](https://github.com/devotica-labs/terraform-aws-vpc/commit/5b1eafff01b5ca60a1f601948cd15741015c19d5))
+
+
+### Bug Fixes
+
+* **endpoints:** use data.aws_region.current.region (AWS provider v6) ([d5317cc](https://github.com/devotica-labs/terraform-aws-vpc/commit/d5317cce5d84268dde8b45b33bb8f29e2e8350dd))
+
 ## [0.5.0](https://github.com/devotica-labs/terraform-aws-vpc/compare/v0.4.3...v0.5.0) (2026-05-12)
 
 
