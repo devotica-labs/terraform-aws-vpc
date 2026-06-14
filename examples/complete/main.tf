@@ -20,14 +20,12 @@ provider "aws" {
   skip_requesting_account_id  = true
 }
 
-# Uses local path during development.
-# Change to Registry source after first release:
-#   source  = "devotica-labs/vpc/aws"
-#   version = "~> 1.0"
+# Published at the Terraform Registry as devotica-labs/vpc/aws.
+# Once a v1.0.0 release ships, bump this constraint to "~> 1.0".
 
 module "vpc" {
-  source = "devotica-labs/vpc/aws"
-  version = "~> 1.0"
+  source  = "devotica-labs/vpc/aws"
+  version = "~> 0.6"
 
   name = "sample-prod"
 
