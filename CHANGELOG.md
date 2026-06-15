@@ -3,6 +3,13 @@
 Managed by [release-please](https://github.com/googleapis/release-please).
 Do not edit manually — use Conventional Commits in PR titles.
 
+## [0.6.1](https://github.com/devotica-labs/terraform-aws-vpc/compare/v0.6.0...v0.6.1) (2026-06-15)
+
+
+### Bug Fixes
+
+* **examples:** terraform fmt + match published version constraint ([b697604](https://github.com/devotica-labs/terraform-aws-vpc/commit/b697604d46dae7502f92b495581a97012fd9574f))
+
 ## [0.6.0](https://github.com/devotica-labs/terraform-aws-vpc/compare/v0.5.0...v0.6.0) (2026-05-12)
 
 
