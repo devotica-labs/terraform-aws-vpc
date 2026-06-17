@@ -3,6 +3,13 @@
 Managed by [release-please](https://github.com/googleapis/release-please).
 Do not edit manually — use Conventional Commits in PR titles.
 
+## [0.6.2](https://github.com/devotica-labs/terraform-aws-vpc/compare/v0.6.1...v0.6.2) (2026-06-17)
+
+
+### Bug Fixes
+
+* **release:** replace dead CycloneDX action with anchore/sbom-action ([#37](https://github.com/devotica-labs/terraform-aws-vpc/issues/37)) ([c282199](https://github.com/devotica-labs/terraform-aws-vpc/commit/c282199ac38feb1c4af099c3810035527e7614f8))
+
 ## [0.6.1](https://github.com/devotica-labs/terraform-aws-vpc/compare/v0.6.0...v0.6.1) (2026-06-15)
 
 
