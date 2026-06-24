@@ -118,19 +118,22 @@ provider "aws" {
   skip_requesting_account_id  = true
 }
 
-# Published at the Terraform Registry as devotica-labs/vpc/aws.
-# Once a v1.0.0 release ships, bump this constraint to "~> 1.0".
+# NOTE: temporarily pinned to local source while the database subnet tier
+# and interface VPC endpoint features are under development. Once a new
+# version is tagged and published, switch this back to:
+#   source  = "devotica-labs/vpc/aws"
+#   version = "~> 0.7"   (or whatever the new minor version is)
 
 module "vpc" {
-  source  = "devotica-labs/vpc/aws"
-  version = "~> 0.6"
+  source = "../.."
 
   name = "sample-prod"
 
-  cidr_block           = "10.0.0.0/16"
-  availability_zones   = ["ap-south-1a", "ap-south-1b", "ap-south-1c"]
-  public_subnet_cidrs  = ["10.0.0.0/24", "10.0.1.0/24", "10.0.2.0/24"]
-  private_subnet_cidrs = ["10.0.10.0/24", "10.0.11.0/24", "10.0.12.0/24"]
+  cidr_block            = "10.0.0.0/16"
+  availability_zones    = ["ap-south-1a", "ap-south-1b", "ap-south-1c"]
+  public_subnet_cidrs   = ["10.0.0.0/24", "10.0.1.0/24", "10.0.2.0/24"]
+  private_subnet_cidrs  = ["10.0.10.0/24", "10.0.11.0/24", "10.0.12.0/24"]
+  database_subnet_cidrs = ["10.0.20.0/24", "10.0.21.0/24", "10.0.22.0/24"]
 
   enable_nat_gateway = true
   single_nat_gateway = false
@@ -146,6 +149,16 @@ module "vpc" {
 
   manage_default_security_group = true
 
+  # Database tier — isolated subnets for RDS, ElastiCache, Redshift.
+  create_database_subnet_group    = true
+  create_elasticache_subnet_group = true
+
+  # Interface VPC Endpoints — PrivateLink access to AWS APIs from private
+  # subnets without a NAT gateway in the path.
+  interface_endpoints             = ["ecr.api", "ecr.dkr", "ssm", "ssmmessages", "ec2messages", "kms", "secretsmanager", "logs", "sts"]
+  interface_endpoints_private_dns = true
+  interface_endpoints_subnet_tier = "private"
+
   # Foundation Plan §15.2 — six mandatory tags on every resource.
   tags = {
     Environment = "production"
@@ -156,6 +169,7 @@ module "vpc" {
     Repo        = "https://github.com/devotica-labs/terraform-aws-vpc"
   }
 }
+
 ```
 
 ## Requirements
@@ -168,14 +182,16 @@ module "vpc" {
 
 | Name | Version |
 |------|---------|
-| <a name="provider_aws"></a> [aws](#provider\_aws) | 6.50.0 |
+| <a name="provider_aws"></a> [aws](#provider\_aws) | 6.51.0 |
 ## Resources
 
 | Name | Type |
 |------|------|
 | [aws_cloudwatch_log_group.flow_logs](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/cloudwatch_log_group) | resource |
+| [aws_db_subnet_group.this](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/db_subnet_group) | resource |
 | [aws_default_security_group.this](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/default_security_group) | resource |
 | [aws_eip.nat](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/eip) | resource |
+| [aws_elasticache_subnet_group.this](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/elasticache_subnet_group) | resource |
 | [aws_flow_log.this](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/flow_log) | resource |
 | [aws_iam_role.flow_logs](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_role) | resource |
 | [aws_iam_role_policy.flow_logs](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_role_policy) | resource |
@@ -185,14 +201,19 @@ module "vpc" {
 | [aws_route.private_nat](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/route) | resource |
 | [aws_route.public_additional](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/route) | resource |
 | [aws_route.public_igw](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/route) | resource |
+| [aws_route_table.database](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/route_table) | resource |
 | [aws_route_table.private](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/route_table) | resource |
 | [aws_route_table.public](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/route_table) | resource |
+| [aws_route_table_association.database](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/route_table_association) | resource |
 | [aws_route_table_association.private](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/route_table_association) | resource |
 | [aws_route_table_association.public](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/route_table_association) | resource |
+| [aws_security_group.interface_endpoints](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/security_group) | resource |
+| [aws_subnet.database](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/subnet) | resource |
 | [aws_subnet.private](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/subnet) | resource |
 | [aws_subnet.public](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/subnet) | resource |
 | [aws_vpc.this](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/vpc) | resource |
 | [aws_vpc_endpoint.dynamodb](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/vpc_endpoint) | resource |
+| [aws_vpc_endpoint.interface](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/vpc_endpoint) | resource |
 | [aws_vpc_endpoint.s3](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/vpc_endpoint) | resource |
 ## Inputs
 
@@ -203,6 +224,10 @@ module "vpc" {
 | <a name="input_name"></a> [name](#input\_name) | Logical name for the VPC. Used as a prefix for all child resources. | `string` | n/a | yes |
 | <a name="input_additional_private_routes"></a> [additional\_private\_routes](#input\_additional\_private\_routes) | Custom routes added to EVERY private route table (one per AZ). Each entry: one destination + one target. Same field shape as additional\_public\_routes. | <pre>list(object({<br/>    destination_cidr_block      = optional(string)<br/>    destination_ipv6_cidr_block = optional(string)<br/>    transit_gateway_id          = optional(string)<br/>    vpc_peering_connection_id   = optional(string)<br/>    gateway_id                  = optional(string)<br/>    nat_gateway_id              = optional(string)<br/>    network_interface_id        = optional(string)<br/>    vpc_endpoint_id             = optional(string)<br/>  }))</pre> | `[]` | no |
 | <a name="input_additional_public_routes"></a> [additional\_public\_routes](#input\_additional\_public\_routes) | Custom routes added to the shared public route table beyond 0.0.0.0/0 → IGW. Each entry: one destination + one target. | <pre>list(object({<br/>    destination_cidr_block      = optional(string)<br/>    destination_ipv6_cidr_block = optional(string)<br/>    transit_gateway_id          = optional(string)<br/>    vpc_peering_connection_id   = optional(string)<br/>    gateway_id                  = optional(string)<br/>    nat_gateway_id              = optional(string)<br/>    network_interface_id        = optional(string)<br/>    vpc_endpoint_id             = optional(string)<br/>  }))</pre> | `[]` | no |
+| <a name="input_create_database_subnet_group"></a> [create\_database\_subnet\_group](#input\_create\_database\_subnet\_group) | Create an aws\_db\_subnet\_group spanning the database subnets, for direct consumption by the RDS module. Ignored when database\_subnet\_cidrs is empty. | `bool` | `true` | no |
+| <a name="input_create_elasticache_subnet_group"></a> [create\_elasticache\_subnet\_group](#input\_create\_elasticache\_subnet\_group) | Create an aws\_elasticache\_subnet\_group spanning the database subnets, for direct consumption by the ElastiCache module. Ignored when database\_subnet\_cidrs is empty. | `bool` | `false` | no |
+| <a name="input_database_subnet_cidrs"></a> [database\_subnet\_cidrs](#input\_database\_subnet\_cidrs) | IPv4 CIDRs for isolated database subnets. Length must match availability\_zones. Leave empty to create no database tier. These subnets have NO internet route (no IGW, no NAT) — fully isolated for RDS/ElastiCache/Redshift. | `list(string)` | `[]` | no |
+| <a name="input_database_subnet_tags"></a> [database\_subnet\_tags](#input\_database\_subnet\_tags) | Tags applied ONLY to database subnets, in addition to var.tags. | `map(string)` | `{}` | no |
 | <a name="input_enable_dns_hostnames"></a> [enable\_dns\_hostnames](#input\_enable\_dns\_hostnames) | Assign public DNS hostnames to instances with public IPs. | `bool` | `true` | no |
 | <a name="input_enable_dns_support"></a> [enable\_dns\_support](#input\_enable\_dns\_support) | Enable DNS resolution in the VPC. | `bool` | `true` | no |
 | <a name="input_enable_dynamodb_gateway_endpoint"></a> [enable\_dynamodb\_gateway\_endpoint](#input\_enable\_dynamodb\_gateway\_endpoint) | Create a free DynamoDB gateway VPC endpoint attached to every private route table. Removes NAT charges for DynamoDB traffic from private subnets. | `bool` | `false` | no |
@@ -215,6 +240,9 @@ module "vpc" {
 | <a name="input_flow_logs_retention_days"></a> [flow\_logs\_retention\_days](#input\_flow\_logs\_retention\_days) | CloudWatch Logs retention period for flow log entries. Ignored when flow\_logs\_destination\_type = 's3'. | `number` | `30` | no |
 | <a name="input_flow_logs_s3_bucket_arn"></a> [flow\_logs\_s3\_bucket\_arn](#input\_flow\_logs\_s3\_bucket\_arn) | ARN of the S3 bucket (optionally with /prefix) to receive flow logs. Required when flow\_logs\_destination\_type = 's3'; ignored otherwise. The bucket must already exist and have an S3 bucket policy allowing the VPC Flow Logs service. | `string` | `""` | no |
 | <a name="input_flow_logs_traffic_type"></a> [flow\_logs\_traffic\_type](#input\_flow\_logs\_traffic\_type) | Traffic to capture: ACCEPT, REJECT, or ALL. | `string` | `"ALL"` | no |
+| <a name="input_interface_endpoints"></a> [interface\_endpoints](#input\_interface\_endpoints) | List of AWS service short-names to expose as interface VPC endpoints (PrivateLink), e.g. ["ecr.api", "ecr.dkr", "ssm", "ssmmessages", "ec2messages", "kms", "secretsmanager", "logs", "sts"]. Each creates an ENI in every subnet of the chosen tier and bills hourly per AZ. Empty (default) creates none. | `list(string)` | `[]` | no |
+| <a name="input_interface_endpoints_private_dns"></a> [interface\_endpoints\_private\_dns](#input\_interface\_endpoints\_private\_dns) | Enable private DNS for interface endpoints so standard AWS API hostnames (e.g. ssm.<region>.amazonaws.com) resolve to the endpoint ENIs automatically. Requires enable\_dns\_support and enable\_dns\_hostnames. | `bool` | `true` | no |
+| <a name="input_interface_endpoints_subnet_tier"></a> [interface\_endpoints\_subnet\_tier](#input\_interface\_endpoints\_subnet\_tier) | Which subnet tier hosts the interface endpoint ENIs: 'private' (default) or 'database'. Use 'database' when you run fully-isolated workloads that need AWS API access without a private-tier NAT path. | `string` | `"private"` | no |
 | <a name="input_manage_default_security_group"></a> [manage\_default\_security\_group](#input\_manage\_default\_security\_group) | Take ownership of the default security group and remove all rules (CIS AWS Foundations 4.3). | `bool` | `true` | no |
 | <a name="input_private_subnet_cidrs"></a> [private\_subnet\_cidrs](#input\_private\_subnet\_cidrs) | IPv4 CIDRs for private subnets. Length must match availability\_zones. Leave empty to create no private subnets. | `list(string)` | `[]` | no |
 | <a name="input_private_subnet_tags"></a> [private\_subnet\_tags](#input\_private\_subnet\_tags) | Tags applied ONLY to private subnets, in addition to var.tags. Common use: EKS internal-ELB discovery — set {"kubernetes.io/role/internal-elb" = "1"}. | `map(string)` | `{}` | no |
@@ -226,10 +254,18 @@ module "vpc" {
 
 | Name | Description |
 |------|-------------|
+| <a name="output_database_route_table_ids"></a> [database\_route\_table\_ids](#output\_database\_route\_table\_ids) | List of database route table IDs in AZ order (each isolated — no internet route). |
+| <a name="output_database_subnet_arns"></a> [database\_subnet\_arns](#output\_database\_subnet\_arns) | List of database subnet ARNs in AZ order. |
+| <a name="output_database_subnet_group_name"></a> [database\_subnet\_group\_name](#output\_database\_subnet\_group\_name) | Name of the aws\_db\_subnet\_group. Empty string when not created. Pass directly to the RDS module. |
+| <a name="output_database_subnet_ids"></a> [database\_subnet\_ids](#output\_database\_subnet\_ids) | List of isolated database subnet IDs in AZ order. Empty when database\_subnet\_cidrs is empty. |
 | <a name="output_default_security_group_id"></a> [default\_security\_group\_id](#output\_default\_security\_group\_id) | ID of the default security group (locked down when manage\_default\_security\_group = true). |
 | <a name="output_dynamodb_gateway_endpoint_id"></a> [dynamodb\_gateway\_endpoint\_id](#output\_dynamodb\_gateway\_endpoint\_id) | ID of the DynamoDB gateway VPC endpoint. Empty string when enable\_dynamodb\_gateway\_endpoint = false. |
+| <a name="output_elasticache_subnet_group_name"></a> [elasticache\_subnet\_group\_name](#output\_elasticache\_subnet\_group\_name) | Name of the aws\_elasticache\_subnet\_group. Empty string when not created. |
 | <a name="output_flow_log_cloudwatch_log_group_arn"></a> [flow\_log\_cloudwatch\_log\_group\_arn](#output\_flow\_log\_cloudwatch\_log\_group\_arn) | ARN of the CloudWatch Log Group for Flow Logs. Empty string when enable\_flow\_logs = false. |
 | <a name="output_flow_log_id"></a> [flow\_log\_id](#output\_flow\_log\_id) | ID of the VPC Flow Log. Empty string when enable\_flow\_logs = false. |
+| <a name="output_interface_endpoint_dns_entries"></a> [interface\_endpoint\_dns\_entries](#output\_interface\_endpoint\_dns\_entries) | Map of service short-name to list of DNS entries (hostname + hosted zone id) for each interface endpoint. |
+| <a name="output_interface_endpoint_ids"></a> [interface\_endpoint\_ids](#output\_interface\_endpoint\_ids) | Map of service short-name to interface VPC endpoint ID. Empty map when no interface endpoints are requested. |
+| <a name="output_interface_endpoints_security_group_id"></a> [interface\_endpoints\_security\_group\_id](#output\_interface\_endpoints\_security\_group\_id) | ID of the security group guarding interface endpoint ENIs. Empty string when no interface endpoints exist. |
 | <a name="output_internet_gateway_id"></a> [internet\_gateway\_id](#output\_internet\_gateway\_id) | ID of the Internet Gateway. Empty string when no public subnets exist. |
 | <a name="output_nat_gateway_ids"></a> [nat\_gateway\_ids](#output\_nat\_gateway\_ids) | List of NAT Gateway IDs. Empty list when enable\_nat\_gateway = false. |
 | <a name="output_nat_public_ips"></a> [nat\_public\_ips](#output\_nat\_public\_ips) | Elastic IP addresses associated with NAT gateways. |
