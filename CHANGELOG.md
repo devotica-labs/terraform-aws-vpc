@@ -3,6 +3,13 @@
 Managed by [release-please](https://github.com/googleapis/release-please).
 Do not edit manually — use Conventional Commits in PR titles.
 
+## [0.7.0](https://github.com/devotica-labs/terraform-aws-vpc/compare/v0.6.2...v0.7.0) (2026-06-24)
+
+
+### Features
+
+* add isolated database subnet tier and interface VPC endpoints ([#44](https://github.com/devotica-labs/terraform-aws-vpc/issues/44)) ([93c176f](https://github.com/devotica-labs/terraform-aws-vpc/commit/93c176f7428544643fc8c94329f6af44808e0fdb))
+
 ## [0.6.2](https://github.com/devotica-labs/terraform-aws-vpc/compare/v0.6.1...v0.6.2) (2026-06-17)
 
 
