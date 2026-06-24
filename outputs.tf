@@ -111,3 +111,66 @@ output "dynamodb_gateway_endpoint_id" {
   description = "ID of the DynamoDB gateway VPC endpoint. Empty string when enable_dynamodb_gateway_endpoint = false."
   value       = length(aws_vpc_endpoint.dynamodb) > 0 ? aws_vpc_endpoint.dynamodb[0].id : ""
 }
+
+# ---------------------------------------------------------------------------
+# Database tier
+# ---------------------------------------------------------------------------
+
+output "database_subnet_ids" {
+  description = "List of isolated database subnet IDs in AZ order. Empty when database_subnet_cidrs is empty."
+  value = [
+    for az in var.availability_zones :
+    aws_subnet.database[az].id
+    if contains(keys(local.database_subnet_map), az)
+  ]
+}
+
+output "database_subnet_arns" {
+  description = "List of database subnet ARNs in AZ order."
+  value = [
+    for az in var.availability_zones :
+    aws_subnet.database[az].arn
+    if contains(keys(local.database_subnet_map), az)
+  ]
+}
+
+output "database_route_table_ids" {
+  description = "List of database route table IDs in AZ order (each isolated — no internet route)."
+  value = [
+    for az in var.availability_zones :
+    aws_route_table.database[az].id
+    if contains(keys(local.database_subnet_map), az)
+  ]
+}
+
+output "database_subnet_group_name" {
+  description = "Name of the aws_db_subnet_group. Empty string when not created. Pass directly to the RDS module."
+  value       = length(aws_db_subnet_group.this) > 0 ? aws_db_subnet_group.this[0].name : ""
+}
+
+output "elasticache_subnet_group_name" {
+  description = "Name of the aws_elasticache_subnet_group. Empty string when not created."
+  value       = length(aws_elasticache_subnet_group.this) > 0 ? aws_elasticache_subnet_group.this[0].name : ""
+}
+
+# ---------------------------------------------------------------------------
+# Interface VPC Endpoints
+# ---------------------------------------------------------------------------
+
+output "interface_endpoint_ids" {
+  description = "Map of service short-name to interface VPC endpoint ID. Empty map when no interface endpoints are requested."
+  value       = { for svc, ep in aws_vpc_endpoint.interface : svc => ep.id }
+}
+
+output "interface_endpoint_dns_entries" {
+  description = "Map of service short-name to list of DNS entries (hostname + hosted zone id) for each interface endpoint."
+  value = {
+    for svc, ep in aws_vpc_endpoint.interface :
+    svc => ep.dns_entry
+  }
+}
+
+output "interface_endpoints_security_group_id" {
+  description = "ID of the security group guarding interface endpoint ENIs. Empty string when no interface endpoints exist."
+  value       = length(aws_security_group.interface_endpoints) > 0 ? aws_security_group.interface_endpoints[0].id : ""
+}

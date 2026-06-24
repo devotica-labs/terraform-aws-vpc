@@ -4,7 +4,8 @@
 Reads the output of `terraform show -json plan.binary` from the
 `examples/complete/` plan, maps each planned AWS resource to its
 `diagrams.aws.*` icon, groups subnets by availability zone and tier
-(public / private), and writes a PNG.
+(public / private / database), and renders requested PrivateLink
+interface VPC endpoints, then writes a PNG.
 
 This script is invoked from `.github/workflows/architecture-diagram.yml`
 on every PR and on push to main. The committed PNG lives at
@@ -30,6 +31,7 @@ from pathlib import Path
 from diagrams import Cluster, Diagram, Edge
 from diagrams.aws.management import Cloudwatch
 from diagrams.aws.network import (
+    Endpoint,
     InternetGateway,
     NATGateway,
     PrivateSubnet,
@@ -89,18 +91,23 @@ def render(plan_path: Path, out_no_ext: Path) -> None:
     nat_gws = by_type.get("aws_nat_gateway", [])
 
     # Bucket subnets per AZ, per tier. The vpc module names them
-    # aws_subnet.public["az"] and aws_subnet.private["az"], so we
-    # disambiguate on the resource address.
+    # aws_subnet.public["az"], aws_subnet.private["az"], and
+    # aws_subnet.database["az"], so we disambiguate on the resource address.
     public_by_az: dict[str, list[dict]] = defaultdict(list)
     private_by_az: dict[str, list[dict]] = defaultdict(list)
+    database_by_az: dict[str, list[dict]] = defaultdict(list)
     for r in by_type.get("aws_subnet", []):
         az = values(r).get("availability_zone") or "unknown"
         if ".public" in r["address"]:
             public_by_az[az].append(r)
+        elif ".database" in r["address"]:
+            database_by_az[az].append(r)
         elif ".private" in r["address"]:
             private_by_az[az].append(r)
 
-    all_azs = sorted(set(public_by_az.keys()) | set(private_by_az.keys()))
+    all_azs = sorted(
+        set(public_by_az.keys()) | set(private_by_az.keys()) | set(database_by_az.keys())
+    )
 
     nat_by_az: dict[str, dict] = {}
     for ng in nat_gws:
@@ -113,6 +120,19 @@ def render(plan_path: Path, out_no_ext: Path) -> None:
     has_log_group = bool(by_type.get("aws_cloudwatch_log_group"))
     has_flow_log_role = any(
         ".flow_logs" in r["address"] for r in by_type.get("aws_iam_role", [])
+    )
+
+    # Interface VPC Endpoints (PrivateLink). Service short-name is derived
+    # from the resource address key, e.g. aws_vpc_endpoint.interface["ssm"].
+    interface_endpoints: list[str] = []
+    for r in by_type.get("aws_vpc_endpoint", []):
+        if ".interface" not in r["address"]:
+            continue
+        m = re.search(r'\["([^"]+)"\]', r["address"])
+        interface_endpoints.append(m.group(1) if m else r["address"])
+    has_endpoint_sg = bool(by_type.get("aws_security_group")) and any(
+        ".interface_endpoints" in r["address"]
+        for r in by_type.get("aws_security_group", [])
     )
 
     # ------------------------------------------------------------------------
@@ -162,6 +182,13 @@ def render(plan_path: Path, out_no_ext: Path) -> None:
                         cidr = values(s).get("cidr_block", "")
                         priv_nodes.append(PrivateSubnet(f"Private\n{cidr}"))
 
+                    # Database tier — deliberately has NO edges to NAT or
+                    # IGW. The absence of any outbound edge is the point:
+                    # these subnets have no route to the internet at all.
+                    for s in database_by_az.get(az, []):
+                        cidr = values(s).get("cidr_block", "")
+                        PrivateSubnet(f"Database (isolated)\n{cidr}")
+
                     # Private subnet → NAT for egress
                     if az_nat_node:
                         for p in priv_nodes:
@@ -189,6 +216,16 @@ def render(plan_path: Path, out_no_ext: Path) -> None:
                     if has_flow_log_role:
                         IAMRole("Flow Logs\nIAM Role")
 
+            # PrivateLink interface endpoints — one node per requested AWS
+            # service. Subnet placement (private vs. database tier) isn't
+            # rendered per-AZ here since subnet_ids are unresolved at plan
+            # time; the cluster groups them logically within the VPC.
+            if interface_endpoints:
+                sg_suffix = " (guarded by dedicated SG)" if has_endpoint_sg else ""
+                with Cluster(f"PrivateLink Interface Endpoints{sg_suffix}"):
+                    for svc in sorted(interface_endpoints):
+                        Endpoint(svc)
+
 
 def main() -> None:
     if len(sys.argv) < 3:
@@ -201,3 +238,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+

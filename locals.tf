@@ -29,5 +29,20 @@ locals {
     if length(var.private_subnet_cidrs) > 0
   }
 
+  # Database tier — AZ → CIDR map, stable keys survive AZ list reordering.
+  # No internet route is ever attached to these route tables (see main.tf).
+  database_subnet_map = {
+    for i, az in var.availability_zones :
+    az => var.database_subnet_cidrs[i]
+    if length(var.database_subnet_cidrs) > 0
+  }
+
+  # Interface VPC Endpoints — map of short service name → full AWS
+  # service_name, for stable for_each keys.
+  interface_endpoint_map = {
+    for svc in var.interface_endpoints :
+    svc => "com.amazonaws.${data.aws_region.current.region}.${svc}"
+  }
+
   flow_log_group_name = "/aws/vpc/${var.name}"
 }

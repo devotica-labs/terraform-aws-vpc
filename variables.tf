@@ -240,3 +240,73 @@ variable "private_subnet_tags" {
   type        = map(string)
   default     = {}
 }
+
+# ---------------------------------------------------------------------------
+# Database / isolated subnet tier
+#
+# A third subnet tier with NO route to the internet — not via IGW, not via
+# NAT. Purpose-built for data stores (RDS, ElastiCache, Redshift) that must
+# never have an outbound path to the public internet. Satisfies PCI-DSS
+# network segmentation and RBI data-isolation requirements.
+# ---------------------------------------------------------------------------
+
+variable "database_subnet_cidrs" {
+  description = "IPv4 CIDRs for isolated database subnets. Length must match availability_zones. Leave empty to create no database tier. These subnets have NO internet route (no IGW, no NAT) — fully isolated for RDS/ElastiCache/Redshift."
+  type        = list(string)
+  default     = []
+  validation {
+    condition     = alltrue([for c in var.database_subnet_cidrs : can(cidrhost(c, 0))])
+    error_message = "All database_subnet_cidrs must be valid CIDR notation."
+  }
+}
+
+variable "create_database_subnet_group" {
+  description = "Create an aws_db_subnet_group spanning the database subnets, for direct consumption by the RDS module. Ignored when database_subnet_cidrs is empty."
+  type        = bool
+  default     = true
+}
+
+variable "create_elasticache_subnet_group" {
+  description = "Create an aws_elasticache_subnet_group spanning the database subnets, for direct consumption by the ElastiCache module. Ignored when database_subnet_cidrs is empty."
+  type        = bool
+  default     = false
+}
+
+variable "database_subnet_tags" {
+  description = "Tags applied ONLY to database subnets, in addition to var.tags."
+  type        = map(string)
+  default     = {}
+}
+
+# ---------------------------------------------------------------------------
+# Interface VPC Endpoints (AWS PrivateLink)
+#
+# Unlike the free S3/DynamoDB gateway endpoints, interface endpoints create
+# an ENI in each subnet and bill ~$0.01/hr per endpoint per AZ plus data
+# processing. In return, private workloads reach AWS APIs (ECR, SSM, Secrets
+# Manager, KMS, etc.) WITHOUT a NAT gateway and WITHOUT touching the public
+# internet — smaller attack surface, lower NAT egress cost, and a hard
+# requirement before running EKS/ECS in fully private subnets.
+# ---------------------------------------------------------------------------
+
+variable "interface_endpoints" {
+  description = "List of AWS service short-names to expose as interface VPC endpoints (PrivateLink), e.g. [\"ecr.api\", \"ecr.dkr\", \"ssm\", \"ssmmessages\", \"ec2messages\", \"kms\", \"secretsmanager\", \"logs\", \"sts\"]. Each creates an ENI in every subnet of the chosen tier and bills hourly per AZ. Empty (default) creates none."
+  type        = list(string)
+  default     = []
+}
+
+variable "interface_endpoints_private_dns" {
+  description = "Enable private DNS for interface endpoints so standard AWS API hostnames (e.g. ssm.<region>.amazonaws.com) resolve to the endpoint ENIs automatically. Requires enable_dns_support and enable_dns_hostnames."
+  type        = bool
+  default     = true
+}
+
+variable "interface_endpoints_subnet_tier" {
+  description = "Which subnet tier hosts the interface endpoint ENIs: 'private' (default) or 'database'. Use 'database' when you run fully-isolated workloads that need AWS API access without a private-tier NAT path."
+  type        = string
+  default     = "private"
+  validation {
+    condition     = contains(["private", "database"], var.interface_endpoints_subnet_tier)
+    error_message = "interface_endpoints_subnet_tier must be 'private' or 'database'."
+  }
+}

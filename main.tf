@@ -165,8 +165,11 @@ resource "aws_vpc_endpoint" "s3" {
   vpc_id            = aws_vpc.this.id
   service_name      = "com.amazonaws.${data.aws_region.current.region}.s3"
   vpc_endpoint_type = "Gateway"
-  route_table_ids   = [for rt in aws_route_table.private : rt.id]
-  tags              = merge(local.common_tags, { Name = "${var.name}-s3-endpoint" })
+  route_table_ids = concat(
+    [for rt in aws_route_table.private : rt.id],
+    [for rt in aws_route_table.database : rt.id],
+  )
+  tags = merge(local.common_tags, { Name = "${var.name}-s3-endpoint" })
 }
 
 resource "aws_vpc_endpoint" "dynamodb" {
@@ -174,8 +177,11 @@ resource "aws_vpc_endpoint" "dynamodb" {
   vpc_id            = aws_vpc.this.id
   service_name      = "com.amazonaws.${data.aws_region.current.region}.dynamodb"
   vpc_endpoint_type = "Gateway"
-  route_table_ids   = [for rt in aws_route_table.private : rt.id]
-  tags              = merge(local.common_tags, { Name = "${var.name}-dynamodb-endpoint" })
+  route_table_ids = concat(
+    [for rt in aws_route_table.private : rt.id],
+    [for rt in aws_route_table.database : rt.id],
+  )
+  tags = merge(local.common_tags, { Name = "${var.name}-dynamodb-endpoint" })
 }
 
 # ---------------------------------------------------------------------------
@@ -305,6 +311,126 @@ resource "aws_flow_log" "this" {
     precondition {
       condition     = var.flow_logs_destination_type != "s3" || length(var.flow_logs_s3_bucket_arn) > 0
       error_message = "flow_logs_s3_bucket_arn must be set when flow_logs_destination_type = 's3'."
+    }
+  }
+}
+
+# ---------------------------------------------------------------------------
+# Database / isolated subnets
+#
+# A third subnet tier with NO route to the internet. Each database subnet
+# gets its own route table that is intentionally left with only the
+# implicit local route — no IGW route, no NAT route. Fully isolated.
+# ---------------------------------------------------------------------------
+
+resource "aws_subnet" "database" {
+  for_each = local.database_subnet_map
+
+  vpc_id            = aws_vpc.this.id
+  cidr_block        = each.value
+  availability_zone = each.key
+
+  tags = merge(
+    local.common_tags,
+    var.database_subnet_tags,
+    {
+      Name = "${var.name}-database-${each.key}"
+      Tier = "database"
+    },
+  )
+}
+
+# Per-AZ route table for the database tier. Deliberately has no 0.0.0.0/0
+# route — the database tier must never reach the internet.
+resource "aws_route_table" "database" {
+  for_each = local.database_subnet_map
+  vpc_id   = aws_vpc.this.id
+  tags     = merge(local.common_tags, { Name = "${var.name}-database-rt-${each.key}" })
+}
+
+resource "aws_route_table_association" "database" {
+  for_each       = local.database_subnet_map
+  subnet_id      = aws_subnet.database[each.key].id
+  route_table_id = aws_route_table.database[each.key].id
+}
+
+# Optional: DB subnet group for direct consumption by the RDS module.
+resource "aws_db_subnet_group" "this" {
+  count = length(local.database_subnet_map) > 0 && var.create_database_subnet_group ? 1 : 0
+
+  name       = "${var.name}-db-subnet-group"
+  subnet_ids = [for s in aws_subnet.database : s.id]
+  tags       = merge(local.common_tags, { Name = "${var.name}-db-subnet-group" })
+}
+
+# Optional: ElastiCache subnet group for direct consumption by the cache module.
+resource "aws_elasticache_subnet_group" "this" {
+  count = length(local.database_subnet_map) > 0 && var.create_elasticache_subnet_group ? 1 : 0
+
+  name       = "${var.name}-cache-subnet-group"
+  subnet_ids = [for s in aws_subnet.database : s.id]
+  tags       = merge(local.common_tags, { Name = "${var.name}-cache-subnet-group" })
+}
+
+# ---------------------------------------------------------------------------
+# Interface VPC Endpoints (AWS PrivateLink)
+#
+# One endpoint per requested service. Each places an ENI in every subnet of
+# the chosen tier (private by default) and is guarded by a dedicated
+# security group allowing inbound 443 from the VPC CIDR only.
+# ---------------------------------------------------------------------------
+
+resource "aws_security_group" "interface_endpoints" {
+  count = length(var.interface_endpoints) > 0 ? 1 : 0
+
+  name_prefix = "${var.name}-vpce-"
+  description = "Allow HTTPS from within the VPC to interface VPC endpoints"
+  vpc_id      = aws_vpc.this.id
+
+  ingress {
+    description = "HTTPS from VPC CIDR"
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = [var.cidr_block]
+  }
+
+  egress {
+    description = "Allow all egress (endpoint ENIs reply within VPC)"
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = merge(local.common_tags, { Name = "${var.name}-vpce-sg" })
+
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
+resource "aws_vpc_endpoint" "interface" {
+  for_each = local.interface_endpoint_map
+
+  vpc_id              = aws_vpc.this.id
+  service_name        = each.value
+  vpc_endpoint_type   = "Interface"
+  private_dns_enabled = var.interface_endpoints_private_dns
+  security_group_ids  = [aws_security_group.interface_endpoints[0].id]
+
+  subnet_ids = var.interface_endpoints_subnet_tier == "database" ? (
+    [for s in aws_subnet.database : s.id]
+  ) : [for s in aws_subnet.private : s.id]
+
+  tags = merge(local.common_tags, { Name = "${var.name}-vpce-${each.key}" })
+
+  lifecycle {
+    precondition {
+      condition = var.interface_endpoints_subnet_tier == "database" ? (
+        length(var.database_subnet_cidrs) > 0
+      ) : length(var.private_subnet_cidrs) > 0
+      error_message = "interface_endpoints_subnet_tier points to a tier with no subnets. Provide CIDRs for the chosen tier."
     }
   }
 }
