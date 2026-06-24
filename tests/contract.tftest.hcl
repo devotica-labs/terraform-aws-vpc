@@ -84,3 +84,58 @@ run "default_sg_managed" {
     error_message = "default SG must be managed when manage_default_security_group = true."
   }
 }
+
+# Contract: database tier absent by default
+run "database_tier_absent_by_default" {
+  command = plan
+  assert {
+    condition     = length(aws_subnet.database) == 0
+    error_message = "database subnets must not be planned when database_subnet_cidrs is empty."
+  }
+}
+
+# Contract: database subnet count matches AZ count when enabled
+run "database_subnet_count_stable" {
+  command = plan
+  variables {
+    database_subnet_cidrs = ["172.16.20.0/24", "172.16.21.0/24"]
+  }
+  assert {
+    condition     = length(aws_subnet.database) == 2
+    error_message = "database_subnet_ids length must equal AZ count."
+  }
+}
+
+# Contract: db subnet group created by default once database tier exists
+run "db_subnet_group_default_on" {
+  command = plan
+  variables {
+    database_subnet_cidrs = ["172.16.20.0/24", "172.16.21.0/24"]
+  }
+  assert {
+    condition     = length(aws_db_subnet_group.this) == 1
+    error_message = "db subnet group must be planned by default when database_subnet_cidrs is set."
+  }
+}
+
+# Contract: interface endpoints absent by default
+run "interface_endpoints_absent_by_default" {
+  command = plan
+  assert {
+    condition     = length(aws_vpc_endpoint.interface) == 0
+    error_message = "interface endpoints must not be planned when interface_endpoints is empty."
+  }
+}
+
+# Contract: interface endpoint count matches requested service count
+run "interface_endpoint_count_stable" {
+  command = plan
+  variables {
+    interface_endpoints = ["ssm", "kms"]
+  }
+  assert {
+    condition     = length(aws_vpc_endpoint.interface) == 2
+    error_message = "interface endpoint count must equal the number of requested services."
+  }
+}
+

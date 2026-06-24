@@ -20,19 +20,22 @@ provider "aws" {
   skip_requesting_account_id  = true
 }
 
-# Published at the Terraform Registry as devotica-labs/vpc/aws.
-# Once a v1.0.0 release ships, bump this constraint to "~> 1.0".
+# NOTE: temporarily pinned to local source while the database subnet tier
+# and interface VPC endpoint features are under development. Once a new
+# version is tagged and published, switch this back to:
+#   source  = "devotica-labs/vpc/aws"
+#   version = "~> 0.7"   (or whatever the new minor version is)
 
 module "vpc" {
-  source  = "devotica-labs/vpc/aws"
-  version = "~> 0.6"
+  source = "../.."
 
   name = "sample-prod"
 
-  cidr_block           = "10.0.0.0/16"
-  availability_zones   = ["ap-south-1a", "ap-south-1b", "ap-south-1c"]
-  public_subnet_cidrs  = ["10.0.0.0/24", "10.0.1.0/24", "10.0.2.0/24"]
-  private_subnet_cidrs = ["10.0.10.0/24", "10.0.11.0/24", "10.0.12.0/24"]
+  cidr_block            = "10.0.0.0/16"
+  availability_zones    = ["ap-south-1a", "ap-south-1b", "ap-south-1c"]
+  public_subnet_cidrs   = ["10.0.0.0/24", "10.0.1.0/24", "10.0.2.0/24"]
+  private_subnet_cidrs  = ["10.0.10.0/24", "10.0.11.0/24", "10.0.12.0/24"]
+  database_subnet_cidrs = ["10.0.20.0/24", "10.0.21.0/24", "10.0.22.0/24"]
 
   enable_nat_gateway = true
   single_nat_gateway = false
@@ -48,6 +51,16 @@ module "vpc" {
 
   manage_default_security_group = true
 
+  # Database tier — isolated subnets for RDS, ElastiCache, Redshift.
+  create_database_subnet_group    = true
+  create_elasticache_subnet_group = true
+
+  # Interface VPC Endpoints — PrivateLink access to AWS APIs from private
+  # subnets without a NAT gateway in the path.
+  interface_endpoints             = ["ecr.api", "ecr.dkr", "ssm", "ssmmessages", "ec2messages", "kms", "secretsmanager", "logs", "sts"]
+  interface_endpoints_private_dns = true
+  interface_endpoints_subnet_tier = "private"
+
   # Foundation Plan §15.2 — six mandatory tags on every resource.
   tags = {
     Environment = "production"
@@ -58,3 +71,4 @@ module "vpc" {
     Repo        = "https://github.com/devotica-labs/terraform-aws-vpc"
   }
 }
+
