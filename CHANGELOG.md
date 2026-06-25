@@ -3,6 +3,14 @@
 Managed by [release-please](https://github.com/googleapis/release-please).
 Do not edit manually — use Conventional Commits in PR titles.
 
+## [0.7.1](https://github.com/devotica-labs/terraform-aws-vpc/compare/v0.7.0...v0.7.1) (2026-06-25)
+
+
+### Bug Fixes
+
+* scope interface endpoint SG egress to VPC CIDR instead of 0.0.0.0/0 ([0a9963a](https://github.com/devotica-labs/terraform-aws-vpc/commit/0a9963a4e131f8435e4bb5aa9c09b1e0500c3562))
+* scope interface endpoint SG egress to VPC CIDR instead of 0.0.0.0/0 ([e04cad8](https://github.com/devotica-labs/terraform-aws-vpc/commit/e04cad84b0d8fa38d055e450afe7f0d18f96fbe6))
+
 ## [0.7.0](https://github.com/devotica-labs/terraform-aws-vpc/compare/v0.6.2...v0.7.0) (2026-06-24)
 
 
