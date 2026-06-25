@@ -396,11 +396,11 @@ resource "aws_security_group" "interface_endpoints" {
   }
 
   egress {
-    description = "Allow all egress (endpoint ENIs reply within VPC)"
+    description = "Allow replies back within the VPC CIDR only (endpoint ENIs never need to reach the public internet)"
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
+    cidr_blocks = [var.cidr_block]
   }
 
   tags = merge(local.common_tags, { Name = "${var.name}-vpce-sg" })
@@ -434,3 +434,4 @@ resource "aws_vpc_endpoint" "interface" {
     }
   }
 }
+
