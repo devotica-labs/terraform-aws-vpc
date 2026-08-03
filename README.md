@@ -71,7 +71,7 @@ provider "aws" {
 
 module "vpc" {
   source  = "devotica-labs/vpc/aws"
-  version = "~> 0.7"
+  version = "~> 0.6"
 
   name               = "my-vpc"
   cidr_block         = "10.0.0.0/16"
@@ -182,7 +182,7 @@ module "vpc" {
 
 | Name | Version |
 |------|---------|
-| <a name="provider_aws"></a> [aws](#provider\_aws) | 6.51.0 |
+| <a name="provider_aws"></a> [aws](#provider\_aws) | 6.57.1 |
 ## Resources
 
 | Name | Type |
